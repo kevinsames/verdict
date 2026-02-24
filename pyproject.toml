@@ -44,6 +44,15 @@ dev = [
     "types-PyYAML>=6.0.0",
     "types-requests>=2.31.0",
 ]
+testgen = [
+    "qdrant-client>=1.9.0",
+    "langchain>=0.2.0",
+    "langchain-openai>=0.1.0",
+    "openai>=1.30.0",
+    "pydantic-settings>=2.0.0",
+    "datasets>=2.19.0",
+    "tqdm>=4.66.0",
+]
 
 [project.scripts]
 verdict-init = "verdict.setup.init_catalog:main"
@@ -51,6 +60,7 @@ verdict-inference = "verdict.inference.inference_runner:main"
 verdict-evaluate = "verdict.evaluation.mlflow_evaluator:main"
 verdict-judge = "verdict.evaluation.custom_judges:main"
 verdict-regression = "verdict.regression.regression_detector:main"
+verdict-testgen = "verdict.testgen.generate_dataset:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -77,6 +87,11 @@ module = [
     "databricks.*",
     "mlflow.*",
     "scipy.*",
+    "qdrant_client.*",
+    "langchain.*",
+    "langchain_openai.*",
+    "datasets.*",
+    "tqdm.*",
 ]
 ignore_missing_imports = true
 

@@ -11,6 +11,7 @@ from verdict.evaluation.deterministic_metrics import DeterministicMetricsCalcula
 from verdict.evaluation.mlflow_evaluator import MLflowEvaluator
 from verdict.evaluation.custom_judges import LLMJudge, LLMJudgeEvaluator
 from verdict.regression.regression_detector import RegressionDetector, VerdictLabel
+from verdict.testgen import Settings, TestDatasetGenerator
 
 __all__ = [
     "__version__",
@@ -23,4 +24,6 @@ __all__ = [
     "LLMJudgeEvaluator",
     "RegressionDetector",
     "VerdictLabel",
+    "Settings",
+    "TestDatasetGenerator",
 ]

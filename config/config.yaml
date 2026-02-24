@@ -65,3 +65,20 @@ evaluation:
   sample_size: null
   # Batch size for parallel evaluation
   batch_size: 100
+
+# RAG Test Dataset Generator
+testgen:
+  qdrant:
+    url: "${QDRANT_URL}"
+    collection: "${QDRANT_COLLECTION}"
+    text_field: "text"
+    scroll_limit: 200
+  azure_openai:
+    endpoint: "${AZURE_OPENAI_ENDPOINT}"
+    deployment: "gpt-4o"
+    api_version: "2024-02-01"
+  generation:
+    samples_per_chunk: 1
+    hard_negatives_per_query: 2
+    delay_between_calls: 0.5
+  output_dir: "./output"
