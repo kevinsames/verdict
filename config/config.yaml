@@ -1,0 +1,53 @@
+# Verdict Configuration
+# Update these values for your Databricks environment
+
+# Unity Catalog
+catalog:
+  name: verdict
+  schemas:
+    raw: raw
+    evaluated: evaluated
+    metrics: metrics
+
+# Model Endpoints
+endpoints:
+  # Model endpoint to evaluate (update with your endpoint name)
+  model: "your-model-endpoint"
+  # Judge model for LLM-as-a-judge evaluation
+  judge: "databricks-llama-4"
+
+# MLflow
+mlflow:
+  experiment_path: "/verdict/experiments"
+
+# Regression Detection
+regression:
+  # Threshold for flagging regression (percentage drop)
+  threshold_pct: 5.0
+  # Statistical significance level
+  p_value_threshold: 0.05
+  # Metrics to track for regression
+  metrics:
+    - faithfulness
+    - answer_relevance
+    - judge_score
+    - rouge_l
+    - latency_p95
+
+# Alerts
+alerts:
+  # Webhook URL for notifications (use dbutils.secrets for sensitive values)
+  webhook_url_secret: "verdict/alerts_webhook"
+  # Email recipients (comma-separated)
+  email_recipients_secret: "verdict/alert_emails"
+  # Alert on these verdict labels
+  on_labels:
+    - WARN
+    - FAIL
+
+# Evaluation
+evaluation:
+  # Sample size for evaluation (null = all)
+  sample_size: null
+  # Batch size for parallel evaluation
+  batch_size: 100

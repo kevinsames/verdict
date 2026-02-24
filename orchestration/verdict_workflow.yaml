@@ -1,0 +1,174 @@
+# Verdict Workflow
+# Databricks Workflow definition for end-to-end LLMOps evaluation
+#
+# Deploy with: databricks bundle deploy
+# Run with: databricks bundle run verdict_workflow
+
+bundle:
+  name: verdict
+
+variables:
+  model_endpoint:
+    description: "Model Serving endpoint name"
+    default: "your-model-endpoint"
+
+  baseline_version:
+    description: "Baseline model version for comparison"
+    default: "1"
+
+  candidate_version:
+    description: "Candidate model version to evaluate"
+    default: "2"
+
+  dataset_version:
+    description: "Prompt dataset version"
+    default: "v1"
+
+  catalog_name:
+    description: "Unity Catalog name"
+    default: "verdict"
+
+  judge_endpoint:
+    description: "LLM judge model endpoint"
+    default: "databricks-llama-4"
+
+resources:
+  jobs:
+    verdict_evaluation_job:
+      name: "Verdict: LLM Evaluation Pipeline"
+      description: "End-to-end LLM evaluation with regression detection"
+      tags:
+        project: verdict
+        type: llmops
+
+      parameters:
+        - name: model_endpoint
+          default: "${var.model_endpoint}"
+        - name: baseline_version
+          default: "${var.baseline_version}"
+        - name: candidate_version
+          default: "${var.candidate_version}"
+        - name: dataset_version
+          default: "${var.dataset_version}"
+
+      tasks:
+        # Task 1: Run Inference
+        - task_key: inference
+          description: "Run inference on model endpoint"
+          python_wheel_task:
+            package_name: verdict
+            entry_point: inference
+          parameters:
+            - "--endpoint"
+            - "{{job.parameters.model_endpoint}}"
+            - "--dataset-version"
+            - "{{job.parameters.dataset_version}}"
+            - "--model-version"
+            - "{{job.parameters.candidate_version}}"
+            - "--catalog"
+            - "${var.catalog_name}"
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 2
+            spark_env_vars:
+              PYSPARK_PYTHON: "/databricks/python3/bin/python3"
+          libraries:
+            - whl: ../dist/verdict-*.whl
+          timeout_seconds: 3600
+
+        # Task 2: Run Evaluation
+        - task_key: evaluation
+          description: "Evaluate responses with MLflow and LLM judge"
+          depends_on:
+            - task_key: inference
+          python_wheel_task:
+            package_name: verdict
+            entry_point: evaluate
+          parameters:
+            - "--responses-table"
+            - "raw.model_responses"
+            - "--candidate-version"
+            - "{{job.parameters.candidate_version}}"
+            - "--judge-endpoint"
+            - "${var.judge_endpoint}"
+            - "--catalog"
+            - "${var.catalog_name}"
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 2
+          libraries:
+            - whl: ../dist/verdict-*.whl
+          timeout_seconds: 3600
+
+        # Task 3: Regression Detection
+        - task_key: regression
+          description: "Detect regressions vs baseline"
+          depends_on:
+            - task_key: evaluation
+          python_wheel_task:
+            package_name: verdict
+            entry_point: regression
+          parameters:
+            - "--candidate"
+            - "{{job.parameters.candidate_version}}"
+            - "--baseline"
+            - "{{job.parameters.baseline_version}}"
+            - "--dataset-version"
+            - "{{job.parameters.dataset_version}}"
+            - "--catalog"
+            - "${var.catalog_name}"
+          existing_cluster_id: null  # Uses same cluster as evaluation
+          timeout_seconds: 1800
+
+        # Task 4: Deliver Verdict (Alert)
+        - task_key: alert
+          description: "Send alert based on verdict"
+          depends_on:
+            - task_key: regression
+          python_wheel_task:
+            package_name: verdict
+            entry_point: alert
+          parameters:
+            - "--verdict-task"
+            - "regression"
+            - "--webhook-secret"
+            - "verdict/alerts_webhook"
+          timeout_seconds: 300
+
+      # Job-level email notifications
+      email_notifications:
+        on_failure:
+          - "verdict-alerts@example.com"
+        on_success:
+          - "verdict-alerts@example.com"
+
+      # Schedule (optional - uncomment to enable)
+      # schedule:
+      #   quartz_cron_expression: "0 0 6 * * ?"  # Daily at 6 AM UTC
+      #   timezone_id: "UTC"
+      #   pause_status: "UNPAUSED"
+
+      # Git source for version control
+      git_source:
+        git_url: "https://github.com/your-org/verdict"
+        git_provider: "github"
+        git_branch: "main"
+
+targets:
+  development:
+    default: true
+    workspace:
+      host: "${DATABRICKS_HOST}"
+    variables:
+      catalog_name: "verdict_dev"
+
+  staging:
+    variables:
+      catalog_name: "verdict_staging"
+
+  production:
+    variables:
+      catalog_name: "verdict"
+    mode: production
