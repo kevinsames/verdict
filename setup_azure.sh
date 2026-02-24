@@ -13,6 +13,18 @@ echo "================================================"
 echo "Verdict - Azure Databricks Setup"
 echo "================================================"
 
+# Load .env file if it exists
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    echo ""
+    echo "Loading configuration from .env file..."
+    # Export all variables for subprocesses
+    set -a
+    source "$SCRIPT_DIR/.env"
+    export DATABRICKS_HOST AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET DATABRICKS_TOKEN
+    echo "✓ .env loaded"
+fi
+
 # Check for required tools
 echo ""
 echo "Checking prerequisites..."
@@ -57,20 +69,20 @@ fi
 # Build the wheel
 echo ""
 echo "Building verdict package..."
-pip install build --quiet
-python -m build --wheel
+"$SCRIPT_DIR/.venv/bin/pip" install build --quiet
+"$SCRIPT_DIR/.venv/bin/python" -m build --wheel
 echo "✓ Package built"
 
 # Validate bundle
 echo ""
 echo "Validating Databricks Asset Bundle..."
-databricks bundle validate -t development
+databricks bundle validate -t production
 echo "✓ Bundle validated"
 
 # Deploy bundle
 echo ""
 echo "Deploying to Azure Databricks..."
-databricks bundle deploy -t development
+databricks bundle deploy -t production
 echo "✓ Bundle deployed"
 
 echo ""
@@ -82,5 +94,5 @@ echo "Next steps:"
 echo "1. Create prompt dataset (run notebooks/create_sample_dataset.py)"
 echo "2. Deploy your model to Model Serving endpoint"
 echo "3. Run the pipeline:"
-echo "   databricks bundle run verdict_pipeline -t development"
+echo "   databricks bundle run verdict_pipeline -t production"
 echo ""

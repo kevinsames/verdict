@@ -5,21 +5,6 @@
 bundle:
   name: verdict
 
-# Azure Databricks workspace configuration
-workspace:
-  host: ${DATABRICKS_HOST}
-  # For Azure AD authentication, set these environment variables:
-  # - AZURE_TENANT_ID
-  # - AZURE_CLIENT_ID
-  # - AZURE_CLIENT_SECRET
-
-# Default artifact path
-artifacts:
-  verdict_wheel:
-    type: whl
-    path: .
-    build: "pip wheel --no-deps -w dist ."
-
 variables:
   model_endpoint:
     description: "Model Serving endpoint name to evaluate"
@@ -49,6 +34,12 @@ variables:
     description: "Existing cluster ID for init task (optional)"
     default: ""
 
+artifacts:
+  verdict_wheel:
+    type: whl
+    path: .
+    build: "pip wheel --no-deps -w dist ."
+
 resources:
   jobs:
     verdict_pipeline:
@@ -68,6 +59,8 @@ resources:
           default: ${var.candidate_version}
         - name: dataset_version
           default: ${var.dataset_version}
+        - name: catalog_name
+          default: ${var.catalog_name}
 
       tasks:
         # Task 1: Initialize Unity Catalog (run once)
@@ -75,7 +68,14 @@ resources:
           description: "Initialize Unity Catalog tables"
           notebook_task:
             notebook_path: notebooks/init_catalog.py
-          existing_cluster_id: ${var.cluster_id}
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 1
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
           libraries:
             - whl: dist/verdict-*.whl
           timeout_seconds: 600
@@ -147,7 +147,16 @@ resources:
               baseline_version: "{{job.parameters.baseline_version}}"
               dataset_version: "{{job.parameters.dataset_version}}"
               catalog_name: ${var.catalog_name}
-          existing_cluster_id: null
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 1
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
+          libraries:
+            - whl: dist/verdict-*.whl
           timeout_seconds: 1800
 
         # Task 5: Deliver Verdict (Alert)
@@ -160,7 +169,16 @@ resources:
             base_parameters:
               verdict_task: regression
               webhook_secret: verdict/alerts_webhook
-          existing_cluster_id: null
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 1
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
+          libraries:
+            - whl: dist/verdict-*.whl
           timeout_seconds: 300
 
       email_notifications:
@@ -177,7 +195,6 @@ targets:
     default: true
     mode: development
     workspace:
-      host: ${DATABRICKS_HOST}
       root_path: /Users/${DATABRICKS_USER}/verdict_dev
     variables:
       catalog_name: verdict_dev
@@ -186,7 +203,6 @@ targets:
   staging:
     mode: staging
     workspace:
-      host: ${DATABRICKS_HOST}
       root_path: /Shared/verdict_staging
     variables:
       catalog_name: verdict_staging
@@ -194,7 +210,6 @@ targets:
   production:
     mode: production
     workspace:
-      host: ${DATABRICKS_HOST}
       root_path: /Shared/verdict
     variables:
       catalog_name: verdict

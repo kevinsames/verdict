@@ -9,7 +9,7 @@ description = "Production-grade LLMOps Evaluation Framework on Azure Databricks"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Verdict Team", email = "verdict@example.com"}
+    {name = "Verdict Team", email = "connect@kevin.fsames.com"}
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
