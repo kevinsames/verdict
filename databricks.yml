@@ -70,7 +70,7 @@ resources:
             notebook_path: notebooks/init_catalog.py
           new_cluster:
             spark_version: 14.3.x-scala2.12
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_D4ds_v5
             num_workers: 1
             data_security_mode: SINGLE_USER
             azure_attributes:
@@ -94,7 +94,7 @@ resources:
               catalog_name: ${var.catalog_name}
           new_cluster:
             spark_version: 14.3.x-scala2.12
-            node_type_id: Standard_DS4_v2
+            node_type_id: Standard_D4ds_v5
             num_workers: 2
             data_security_mode: SINGLE_USER
             azure_attributes:
@@ -121,7 +121,7 @@ resources:
               catalog_name: ${var.catalog_name}
           new_cluster:
             spark_version: 14.3.x-scala2.12
-            node_type_id: Standard_E4ds_v4
+            node_type_id: Standard_E4ds_v5
             num_workers: 2
             data_security_mode: SINGLE_USER
             azure_attributes:
@@ -149,7 +149,7 @@ resources:
               catalog_name: ${var.catalog_name}
           new_cluster:
             spark_version: 14.3.x-scala2.12
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_D4ds_v5
             num_workers: 1
             data_security_mode: SINGLE_USER
             azure_attributes:
@@ -171,7 +171,7 @@ resources:
               webhook_secret: verdict/alerts_webhook
           new_cluster:
             spark_version: 14.3.x-scala2.12
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_D4ds_v5
             num_workers: 1
             data_security_mode: SINGLE_USER
             azure_attributes:
