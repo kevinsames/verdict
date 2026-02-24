@@ -12,6 +12,7 @@ Verdict is an automated system that evaluates LLM outputs at scale, tracks quali
 - **Automated Alerts**: Email/webhook notifications on quality regressions
 - **Full Governance**: Unity Catalog integration with Delta Lake storage
 - **Azure Native**: Supports Azure AD, Managed Identity, and Azure Key Vault integration
+- **RAG Test Dataset Generator**: Generate synthetic Q&A pairs from Qdrant vector database for RAG evaluation
 
 ## Architecture
 
@@ -19,16 +20,16 @@ Verdict is an automated system that evaluates LLM outputs at scale, tracks quali
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │ Prompt Dataset  │ ──▶ │ Inference Runner │ ──▶ │ Model Responses │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
-                                                         │
-                                                         ▼
+        ▲                                                │
+        │                                                ▼
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│ Metric Summary  │ ◀── │ Regr. Detector   │ ◀── │  Evaluator      │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-        │                       │
-        ▼                       ▼
-┌─────────────────┐     ┌──────────────────┐
-│    Dashboard    │     │     Alerts       │
-└─────────────────┘     └──────────────────┘
+│    Testgen      │     │ Metric Summary   │ ◀── │ Regr. Detector  │
+│ (Qdrant → Q&A)  │     └─────────────────┘     └─────────────────┘
+└─────────────────┘             │                       │
+                                ▼                       ▼
+                        ┌─────────────────┐     ┌──────────────────┐
+                        │    Dashboard    │     │     Alerts       │
+                        └─────────────────┘     └──────────────────┘
 ```
 
 ## Quick Start
@@ -130,6 +131,7 @@ verdict/
 ├── notebooks/                   # Databricks notebooks
 │   ├── init_catalog.py          # Unity Catalog setup
 │   ├── create_sample_dataset.py # Sample data creation
+│   ├── run_testgen.py           # RAG test dataset generation
 │   ├── run_inference.py         # Inference task
 │   ├── run_evaluation.py        # Evaluation task
 │   ├── run_regression.py        # Regression detection
@@ -139,6 +141,7 @@ verdict/
 │   ├── data/                    # Prompt dataset management
 │   ├── inference/               # Parallel inference
 │   ├── evaluation/              # Evaluation modules
+│   ├── testgen/                 # RAG test dataset generator
 │   └── regression/              # Regression detection
 ├── config/config.yaml           # Configuration
 ├── dashboard/                   # SQL dashboard queries
@@ -198,6 +201,74 @@ Automatically used when running on Azure VMs, AKS, or Azure Functions.
 export DATABRICKS_TOKEN="your-personal-access-token"
 export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
 ```
+
+## RAG Test Dataset Generator
+
+The `verdict-testgen` module generates synthetic test datasets from Qdrant vector database for RAG evaluation. It creates Q&A pairs with ground truth answers from your document chunks.
+
+### Installation
+
+```bash
+pip install verdict[testgen]
+```
+
+### Usage
+
+**CLI:**
+```bash
+# Set required environment variables
+export QDRANT_COLLECTION="documents"
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
+export AZURE_OPENAI_API_KEY="your-api-key"
+
+# Generate Q&A pairs
+verdict-testgen --collection documents --limit 100
+
+# Generate and load to Unity Catalog
+verdict-testgen --collection documents --load-to-catalog --dataset-version v1
+```
+
+**Python API:**
+```python
+from verdict.testgen import Settings, TestDatasetGenerator
+
+settings = Settings(
+    qdrant_collection="documents",
+    qdrant_url="http://localhost:6333",
+    qdrant_scroll_limit=100,
+)
+
+generator = TestDatasetGenerator(settings)
+result = generator.generate()
+
+# Load to Unity Catalog
+generator.load_to_catalog(
+    qa_pairs=result["qa_pairs_data"],
+    version="v1",
+    catalog_name="verdict",
+)
+```
+
+### Output Formats
+
+The generator produces three output files:
+
+| File | Description |
+|------|-------------|
+| `qa_pairs.jsonl` | Question-answer pairs with chunk references |
+| `retrieval_eval.jsonl` | Retrieval evaluation format with hard negatives |
+| `rag_eval.jsonl` | RAG evaluation format for end-to-end testing |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `QDRANT_COLLECTION` | Yes | Qdrant collection name |
+| `AZURE_OPENAI_ENDPOINT` | Yes | Azure OpenAI resource URL |
+| `AZURE_OPENAI_API_KEY` | Yes | Azure OpenAI API key |
+| `QDRANT_URL` | No | Qdrant server URL (default: `http://localhost:6333`) |
+| `QDRANT_API_KEY` | No | Qdrant Cloud API key |
+| `OUTPUT_DIR` | No | Output directory (default: `./output`) |
 
 ## License
 

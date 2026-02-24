@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Widget parameters
 dbutils.widgets.text("candidate_version", "", "Candidate Version")
 dbutils.widgets.text("run_id", "", "Run ID (from inference)")
-dbutils.widgets.text("judge_endpoint", "databricks-llama-4", "Judge Model Endpoint")
+dbutils.widgets.text("judge_endpoint", "databricks-llama-4-maverick", "Judge Model Endpoint")
 dbutils.widgets.text("catalog_name", "verdict", "Catalog Name")
 
 candidate_version = dbutils.widgets.get("candidate_version")

@@ -34,6 +34,14 @@ variables:
     description: "Existing cluster ID for init task (optional)"
     default: ""
 
+  qdrant_collection:
+    description: "Qdrant collection name for testgen"
+    default: "documents"
+
+  qdrant_url:
+    description: "Qdrant server URL"
+    default: "http://localhost:6333"
+
 artifacts:
   verdict_wheel:
     type: whl
@@ -107,6 +115,34 @@ resources:
             - pypi:
                 package: azure-keyvault-secrets>=4.7.0
           timeout_seconds: 3600
+
+        # Task 2a: Generate Test Dataset (optional)
+        - task_key: testgen
+          description: "Generate RAG test dataset from Qdrant"
+          depends_on:
+            - task_key: init_catalog
+          notebook_task:
+            notebook_path: notebooks/run_testgen.py
+            base_parameters:
+              qdrant_collection: ${var.qdrant_collection}
+              qdrant_url: ${var.qdrant_url}
+              dataset_version: "{{job.parameters.dataset_version}}"
+              catalog_name: ${var.catalog_name}
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_D4ds_v5
+            num_workers: 1
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
+          libraries:
+            - whl: dist/verdict-*.whl
+            - pypi:
+                package: qdrant-client>=1.7.0
+            - pypi:
+                package: azure-identity>=1.15.0
+          timeout_seconds: 1800
 
         # Task 3: Run Evaluation
         - task_key: evaluation

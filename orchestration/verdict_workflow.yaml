@@ -16,7 +16,7 @@ bundle:
 variables:
   model_endpoint:
     description: "Model Serving endpoint name"
-    default: "your-model-endpoint"
+    default: "databricks-gpt-oss-20b"
 
   baseline_version:
     description: "Baseline model version for comparison"
@@ -36,7 +36,7 @@ variables:
 
   judge_endpoint:
     description: "LLM judge model endpoint"
-    default: "databricks-llama-4"
+    default: "databricks-llama-4-maverick"
 
 resources:
   jobs:

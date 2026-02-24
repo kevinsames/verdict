@@ -144,7 +144,7 @@ Edit `config/config.yaml` or set parameters in the workflow:
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `model_endpoint` | Model Serving endpoint to evaluate | `your-model-endpoint` |
-| `judge_endpoint` | LLM judge model for evaluation | `databricks-llama-4` |
+| `judge_endpoint` | LLM judge model for evaluation | `databricks-llama-4-maverick` |
 | `threshold_pct` | Regression threshold percentage | `5.0` |
 | `p_value_threshold` | Statistical significance level | `0.05` |
 
