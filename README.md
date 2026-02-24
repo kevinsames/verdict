@@ -1,16 +1,17 @@
 # Verdict
 
-**Production-grade LLMOps Evaluation Framework on Databricks**
+**Production-grade LLMOps Evaluation Framework on Azure Databricks**
 
-Verdict is an automated system that evaluates LLM outputs at scale, tracks quality metrics over time, detects regressions across model versions, and triggers alerts — all natively on Databricks.
+Verdict is an automated system that evaluates LLM outputs at scale, tracks quality metrics over time, detects regressions across model versions, and triggers alerts — all natively on Azure Databricks.
 
 ## Features
 
-- **Scalable Inference**: Spark-based parallel inference against Databricks Model Serving endpoints
+- **Scalable Inference**: Spark-based parallel inference against Azure Databricks Model Serving endpoints
 - **Multi-metric Evaluation**: MLflow LLM Evaluate + custom LLM-as-a-judge scorers
 - **Regression Detection**: Statistical comparison across model versions with Mann-Whitney U test
 - **Automated Alerts**: Email/webhook notifications on quality regressions
 - **Full Governance**: Unity Catalog integration with Delta Lake storage
+- **Azure Native**: Supports Azure AD, Managed Identity, and Azure Key Vault integration
 
 ## Architecture
 
@@ -119,10 +120,32 @@ verdict/
 
 ## Requirements
 
-- Databricks Runtime 14.0+
+- Azure Databricks Runtime 14.0+
 - Unity Catalog enabled
 - Model Serving endpoints deployed
 - Python 3.10+
+- Azure AD authentication (recommended) or PAT token
+
+## Azure Authentication
+
+Verdict supports multiple authentication methods for Azure Databricks:
+
+### 1. Azure AD Service Principal (Recommended)
+```bash
+export AZURE_TENANT_ID="your-tenant-id"
+export AZURE_CLIENT_ID="your-client-id"
+export AZURE_CLIENT_SECRET="your-client-secret"
+export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
+```
+
+### 2. Managed Identity
+Automatically used when running on Azure VMs, AKS, or Azure Functions.
+
+### 3. PAT Token
+```bash
+export DATABRICKS_TOKEN="your-personal-access-token"
+export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
+```
 
 ## License
 

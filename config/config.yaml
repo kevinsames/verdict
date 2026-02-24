@@ -1,5 +1,5 @@
 # Verdict Configuration
-# Update these values for your Databricks environment
+# Update these values for your Azure Databricks environment
 
 # Unity Catalog
 catalog:
@@ -8,6 +8,20 @@ catalog:
     raw: raw
     evaluated: evaluated
     metrics: metrics
+
+# Azure Databricks Authentication
+# Supports: azure_ad (recommended), managed_identity, pat
+azure:
+  # Authentication method: "azure_ad", "managed_identity", or "pat"
+  auth_method: "azure_ad"
+  # Azure AD app registration (for azure_ad method)
+  tenant_id: "${AZURE_TENANT_ID}"
+  client_id: "${AZURE_CLIENT_ID}"
+  client_secret: "${AZURE_CLIENT_SECRET}"
+  # Azure Key Vault for secrets (optional)
+  key_vault_name: "${AZURE_KEY_VAULT_NAME}"
+  # Workspace URL (e.g., https://adb-<workspace-id>.<random>.azuredatabricks.net)
+  workspace_url: "${DATABRICKS_HOST}"
 
 # Model Endpoints
 endpoints:

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "verdict"
 version = "0.1.0"
-description = "Production-grade LLMOps Evaluation Framework on Databricks"
+description = "Production-grade LLMOps Evaluation Framework on Azure Databricks"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
@@ -30,6 +30,8 @@ dependencies = [
     "requests>=2.31.0",
     "pyyaml>=6.0",
     "rouge-score>=0.1.2",
+    "azure-identity>=1.15.0",
+    "azure-keyvault-secrets>=4.7.0",
 ]
 
 [project.optional-dependencies]

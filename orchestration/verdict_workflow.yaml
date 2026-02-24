@@ -1,8 +1,14 @@
 # Verdict Workflow
-# Databricks Workflow definition for end-to-end LLMOps evaluation
+# Azure Databricks Workflow definition for end-to-end LLMOps evaluation
 #
 # Deploy with: databricks bundle deploy
 # Run with: databricks bundle run verdict_workflow
+#
+# Azure Databricks VM types:
+# - Standard_DS3_v2: 4 vCPUs, 14GB RAM (general purpose)
+# - Standard_DS4_v2: 8 vCPUs, 28GB RAM (general purpose)
+# - Standard_E4ds_v4: 4 vCPUs, 32GB RAM (memory optimized)
+# - Standard_F4s_v2: 4 vCPUs, 8GB RAM (compute optimized)
 
 bundle:
   name: verdict
@@ -69,8 +75,12 @@ resources:
             - "${var.catalog_name}"
           new_cluster:
             spark_version: "14.3.x-scala2.12"
-            node_type_id: "i3.xlarge"
+            node_type_id: "Standard_DS4_v2"
             num_workers: 2
+            azure_attributes:
+              first_on_demand: 1
+              availability: "ON_DEMAND_AZURE"
+              spot_bid_max_price: -1
             spark_env_vars:
               PYSPARK_PYTHON: "/databricks/python3/bin/python3"
           libraries:
@@ -96,8 +106,12 @@ resources:
             - "${var.catalog_name}"
           new_cluster:
             spark_version: "14.3.x-scala2.12"
-            node_type_id: "i3.xlarge"
+            node_type_id: "Standard_DS4_v2"
             num_workers: 2
+            azure_attributes:
+              first_on_demand: 1
+              availability: "ON_DEMAND_AZURE"
+              spot_bid_max_price: -1
           libraries:
             - whl: ../dist/verdict-*.whl
           timeout_seconds: 3600
