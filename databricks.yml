@@ -1,0 +1,203 @@
+# Databricks Asset Bundle configuration for Verdict
+# Deploy: databricks bundle deploy
+# Run:    databricks bundle run verdict_pipeline
+
+bundle:
+  name: verdict
+
+# Azure Databricks workspace configuration
+workspace:
+  host: ${DATABRICKS_HOST}
+  # For Azure AD authentication, set these environment variables:
+  # - AZURE_TENANT_ID
+  # - AZURE_CLIENT_ID
+  # - AZURE_CLIENT_SECRET
+
+# Default artifact path
+artifacts:
+  verdict_wheel:
+    type: whl
+    path: .
+    build: "pip wheel --no-deps -w dist ."
+
+variables:
+  model_endpoint:
+    description: "Model Serving endpoint name to evaluate"
+    default: "your-model-endpoint"
+
+  baseline_version:
+    description: "Baseline model version for comparison"
+    default: "1"
+
+  candidate_version:
+    description: "Candidate model version to evaluate"
+    default: "2"
+
+  dataset_version:
+    description: "Prompt dataset version"
+    default: "v1"
+
+  catalog_name:
+    description: "Unity Catalog name"
+    default: "verdict"
+
+  judge_endpoint:
+    description: "LLM judge model endpoint"
+    default: "databricks-llama-4"
+
+  cluster_id:
+    description: "Existing cluster ID for init task (optional)"
+    default: ""
+
+resources:
+  jobs:
+    verdict_pipeline:
+      name: "Verdict: LLM Evaluation Pipeline"
+      description: "End-to-end LLM evaluation with regression detection"
+      tags:
+        project: verdict
+        type: llmops
+        platform: azure
+
+      parameters:
+        - name: model_endpoint
+          default: ${var.model_endpoint}
+        - name: baseline_version
+          default: ${var.baseline_version}
+        - name: candidate_version
+          default: ${var.candidate_version}
+        - name: dataset_version
+          default: ${var.dataset_version}
+
+      tasks:
+        # Task 1: Initialize Unity Catalog (run once)
+        - task_key: init_catalog
+          description: "Initialize Unity Catalog tables"
+          notebook_task:
+            notebook_path: notebooks/init_catalog.py
+          existing_cluster_id: ${var.cluster_id}
+          libraries:
+            - whl: dist/verdict-*.whl
+          timeout_seconds: 600
+
+        # Task 2: Run Inference
+        - task_key: inference
+          description: "Run inference on model endpoint"
+          depends_on:
+            - task_key: init_catalog
+          notebook_task:
+            notebook_path: notebooks/run_inference.py
+            base_parameters:
+              model_endpoint: "{{job.parameters.model_endpoint}}"
+              dataset_version: "{{job.parameters.dataset_version}}"
+              candidate_version: "{{job.parameters.candidate_version}}"
+              catalog_name: ${var.catalog_name}
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_DS4_v2
+            num_workers: 2
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
+          libraries:
+            - whl: dist/verdict-*.whl
+            - pypi:
+                package: azure-identity>=1.15.0
+            - pypi:
+                package: azure-keyvault-secrets>=4.7.0
+          timeout_seconds: 3600
+
+        # Task 3: Run Evaluation
+        - task_key: evaluation
+          description: "Evaluate responses with MLflow and LLM judge"
+          depends_on:
+            - task_key: inference
+          notebook_task:
+            notebook_path: notebooks/run_evaluation.py
+            base_parameters:
+              candidate_version: "{{job.parameters.candidate_version}}"
+              judge_endpoint: ${var.judge_endpoint}
+              catalog_name: ${var.catalog_name}
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_E4ds_v4
+            num_workers: 2
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
+          libraries:
+            - whl: dist/verdict-*.whl
+            - pypi:
+                package: mlflow>=2.10.0
+            - pypi:
+                package: azure-identity>=1.15.0
+          timeout_seconds: 3600
+
+        # Task 4: Regression Detection
+        - task_key: regression
+          description: "Detect regressions vs baseline"
+          depends_on:
+            - task_key: evaluation
+          notebook_task:
+            notebook_path: notebooks/run_regression.py
+            base_parameters:
+              candidate_version: "{{job.parameters.candidate_version}}"
+              baseline_version: "{{job.parameters.baseline_version}}"
+              dataset_version: "{{job.parameters.dataset_version}}"
+              catalog_name: ${var.catalog_name}
+          existing_cluster_id: null
+          timeout_seconds: 1800
+
+        # Task 5: Deliver Verdict (Alert)
+        - task_key: alert
+          description: "Send alert based on verdict"
+          depends_on:
+            - task_key: regression
+          notebook_task:
+            notebook_path: notebooks/send_alert.py
+            base_parameters:
+              verdict_task: regression
+              webhook_secret: verdict/alerts_webhook
+          existing_cluster_id: null
+          timeout_seconds: 300
+
+      email_notifications:
+        on_failure:
+          - verdict-alerts@example.com
+        on_success:
+          - verdict-alerts@example.com
+
+      queue:
+        enabled: true
+
+targets:
+  development:
+    default: true
+    mode: development
+    workspace:
+      host: ${DATABRICKS_HOST}
+      root_path: /Users/${DATABRICKS_USER}/verdict_dev
+    variables:
+      catalog_name: verdict_dev
+      cluster_id: ${DATABRICKS_CLUSTER_ID}
+
+  staging:
+    mode: staging
+    workspace:
+      host: ${DATABRICKS_HOST}
+      root_path: /Shared/verdict_staging
+    variables:
+      catalog_name: verdict_staging
+
+  production:
+    mode: production
+    workspace:
+      host: ${DATABRICKS_HOST}
+      root_path: /Shared/verdict
+    variables:
+      catalog_name: verdict
+    permissions:
+      - level: CAN_VIEW
+        group_name: users

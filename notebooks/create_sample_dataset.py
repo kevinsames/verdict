@@ -1,0 +1,76 @@
+# Databricks notebook source
+# ---
+# title: Create Sample Dataset
+# description: Creates a sample prompt dataset for testing Verdict
+# ---
+
+# COMMAND ----------
+import uuid
+from verdict.data.prompt_dataset import PromptDatasetManager
+
+# COMMAND ----------
+catalog_name = "verdict"
+dataset_version = "v1"
+
+# COMMAND ----------
+# Sample prompts for testing
+sample_prompts = [
+    {
+        "prompt": "What is the capital of France?",
+        "ground_truth": "Paris"
+    },
+    {
+        "prompt": "Explain quantum computing in simple terms.",
+        "ground_truth": "Quantum computing uses quantum mechanics principles like superposition and entanglement to process information in ways classical computers cannot."
+    },
+    {
+        "prompt": "What are the benefits of machine learning?",
+        "ground_truth": "Machine learning enables automation of complex tasks, pattern recognition in large datasets, predictive analytics, and continuous improvement through experience."
+    },
+    {
+        "prompt": "Write a haiku about data science.",
+        "ground_truth": "Numbers tell stories\nHidden patterns emerge bright\nTruth in data shines"
+    },
+    {
+        "prompt": "What is the difference between AI and ML?",
+        "ground_truth": "AI is the broader concept of machines mimicking human intelligence, while ML is a subset of AI that uses statistical methods to enable machines to improve with experience."
+    },
+    {
+        "prompt": "How does a neural network learn?",
+        "ground_truth": "Neural networks learn by adjusting weights based on the error between predicted and actual outputs, using techniques like backpropagation and gradient descent."
+    },
+    {
+        "prompt": "What is Unity Catalog in Databricks?",
+        "ground_truth": "Unity Catalog is a unified governance solution for data and AI assets in Databricks, providing fine-grained access control, audit logging, and data lineage."
+    },
+    {
+        "prompt": "Explain the concept of overfitting.",
+        "ground_truth": "Overfitting occurs when a model learns the training data too well, including noise, leading to poor generalization on new, unseen data."
+    },
+    {
+        "prompt": "What is a confusion matrix?",
+        "ground_truth": "A confusion matrix is a table showing the performance of a classification model by comparing predicted vs actual values, showing true positives, false positives, true negatives, and false negatives."
+    },
+    {
+        "prompt": "Describe the role of a loss function in ML.",
+        "ground_truth": "A loss function measures how well a model's predictions match the actual values, providing a signal for optimization algorithms to adjust model parameters."
+    }
+]
+
+# COMMAND ----------
+# Initialize manager
+manager = PromptDatasetManager(catalog_name=catalog_name)
+
+# COMMAND ----------
+# Create dataset
+count = manager.create_dataset(
+    prompts=sample_prompts,
+    version=dataset_version,
+    metadata={"source": "sample", "created_by": "verdict_setup"}
+)
+
+print(f"Created dataset with {count} prompts")
+
+# COMMAND ----------
+# Verify
+manager.load_dataset(dataset_version).display()

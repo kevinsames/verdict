@@ -1,0 +1,12 @@
+# Azure Databricks CLI Configuration
+# Place this file at ~/.databrickscfg (or set DATABRICKS_CONFIG_FILE)
+
+[verdict-dev]
+host = https://adb-<workspace-id>.<random>.azuredatabricks.net
+# For Azure AD authentication, set these environment variables:
+# AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+# Or use PAT token:
+# token = dapi...
+
+[verdict-prod]
+host = https://adb-<workspace-id>.<random>.azuredatabricks.net

@@ -33,64 +33,116 @@ Verdict is an automated system that evaluates LLM outputs at scale, tracks quali
 
 ## Quick Start
 
-### 1. Setup Unity Catalog
+### Prerequisites
+
+1. **Azure Databricks Workspace** with Unity Catalog enabled
+2. **Databricks CLI** installed:
+   ```bash
+   pip install databricks-cli
+   ```
+3. **Azure CLI** (for Azure AD authentication):
+   ```bash
+   brew install azure-cli
+   ```
+
+### 1. Clone and Configure
 
 ```bash
-python setup/init_catalog.py
+git clone https://github.com/kevinsames/verdict.git
+cd verdict
+
+# Copy example config
+cp .databrickscfg.example ~/.databrickscfg
+
+# Edit with your workspace URL
+# Or set environment variables:
+export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
 ```
 
-### 2. Configure
+### 2. Configure Authentication
 
-Update `config/config.yaml` with your endpoint names and thresholds.
+**Option A: Azure AD Service Principal (Recommended)**
+```bash
+# Create a Service Principal in Azure AD
+az ad sp create-for-rbac --name "verdict-sp" --role Contributor
 
-### 3. Run Inference
+# Set environment variables
+export AZURE_TENANT_ID="<tenant-id>"
+export AZURE_CLIENT_ID="<client-id>"
+export AZURE_CLIENT_SECRET="<client-secret>"
+```
+
+**Option B: Personal Access Token**
+```bash
+# Generate PAT from Databricks workspace -> User Settings -> Developer
+export DATABRICKS_TOKEN="dapi..."
+```
+
+### 3. Deploy to Azure Databricks
 
 ```bash
-python inference/inference_runner.py \
-  --endpoint my-model-endpoint \
-  --dataset prompts_v1
+# Make setup script executable
+chmod +x setup_azure.sh
+
+# Run setup (validates config, builds package, deploys)
+./setup_azure.sh
 ```
 
-### 4. Run Evaluation
+Or manually:
+```bash
+# Build the wheel
+pip install build
+python -m build --wheel
+
+# Deploy using Databricks Asset Bundles
+databricks bundle deploy -t development
+```
+
+### 4. Create Sample Dataset
+
+Run the sample dataset notebook:
+1. Go to **Workspace** → **verdict_dev** → **notebooks**
+2. Open `create_sample_dataset.py`
+3. Click **Run All**
+
+### 5. Run the Pipeline
 
 ```bash
-python evaluation/mlflow_evaluator.py \
-  --responses-table raw.model_responses \
-  --run-id <run_id>
+# Run via CLI
+databricks bundle run verdict_pipeline -t development
 ```
 
-### 5. Check for Regressions
-
-```bash
-python regression/regression_detector.py \
-  --candidate-version 2 \
-  --baseline-version 1
-```
+Or via Databricks UI:
+1. Go to **Workflows**
+2. Find "Verdict: LLM Evaluation Pipeline"
+3. Click **Run Now**
+4. Set parameters:
+   - `model_endpoint`: Your model serving endpoint name
+   - `candidate_version`: Version to evaluate (e.g., "2")
+   - `baseline_version`: Version to compare against (e.g., "1")
+   - `dataset_version`: Dataset version (e.g., "v1")
 
 ## Project Structure
 
 ```
 verdict/
-├── README.md
-├── CLAUDE.md
-├── setup/
-│   └── init_catalog.py          # Unity Catalog setup
-├── data/
-│   └── prompt_dataset.py        # Prompt/ground-truth management
-├── inference/
-│   └── inference_runner.py      # Parallel inference
-├── evaluation/
-│   ├── mlflow_evaluator.py      # MLflow LLM Evaluate
-│   ├── custom_judges.py         # LLM-as-a-judge
-│   └── deterministic_metrics.py # ROUGE, exact match
-├── regression/
-│   └── regression_detector.py   # Statistical comparison
-├── orchestration/
-│   └── verdict_workflow.yaml    # Databricks Workflow
-├── dashboard/
-│   └── verdict_dashboard.sql    # Dashboard queries
-└── config/
-    └── config.yaml              # Centralized config
+├── databricks.yml               # Databricks Asset Bundle config
+├── notebooks/                   # Databricks notebooks
+│   ├── init_catalog.py          # Unity Catalog setup
+│   ├── create_sample_dataset.py # Sample data creation
+│   ├── run_inference.py         # Inference task
+│   ├── run_evaluation.py        # Evaluation task
+│   ├── run_regression.py        # Regression detection
+│   └── send_alert.py            # Alert task
+├── src/verdict/                 # Python package
+│   ├── setup/                   # Unity Catalog setup
+│   ├── data/                    # Prompt dataset management
+│   ├── inference/               # Parallel inference
+│   ├── evaluation/              # Evaluation modules
+│   └── regression/              # Regression detection
+├── config/config.yaml           # Configuration
+├── dashboard/                   # SQL dashboard queries
+└── orchestration/               # Workflow definitions
 ```
 
 ## Verdict Labels
