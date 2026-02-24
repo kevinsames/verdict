@@ -13,7 +13,7 @@ catalog:
 # Supports: azure_ad (recommended), managed_identity, pat
 azure:
   # Authentication method: "azure_ad", "managed_identity", or "pat"
-  auth_method: "pat"
+  auth_method: "azure_ad"
   # Azure AD app registration (for azure_ad method)
   tenant_id: "${AZURE_TENANT_ID}"
   client_id: "${AZURE_CLIENT_ID}"
@@ -22,7 +22,6 @@ azure:
   key_vault_name: "${AZURE_KEY_VAULT_NAME}"
   # Workspace URL (e.g., https://adb-<workspace-id>.<random>.azuredatabricks.net)
   workspace_url: "${DATABRICKS_HOST}"
-  pat_token: "${DATABRICKS_TOKEN}"  # For pat authentication
 
 # Model Endpoints
 endpoints:

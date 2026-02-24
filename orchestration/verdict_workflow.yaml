@@ -166,23 +166,14 @@ resources:
 
       # Git source for version control
       git_source:
-        git_url: "https://github.com/your-org/verdict"
+        git_url: "https://github.com/kevinsames/verdict"
         git_provider: "github"
         git_branch: "main"
 
 targets:
-  development:
+  production:
     default: true
     workspace:
       host: "${DATABRICKS_HOST}"
     variables:
-      catalog_name: "verdict_dev"
-
-  staging:
-    variables:
-      catalog_name: "verdict_staging"
-
-  production:
-    variables:
       catalog_name: "verdict"
-    mode: production
