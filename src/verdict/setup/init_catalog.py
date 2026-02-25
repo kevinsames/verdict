@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class VerdictCatalogSetup:
     """Manages Unity Catalog setup for Verdict using PySpark."""
 
-    def __init__(self, catalog_name: str = "verdict", spark: SparkSession | None = None):
+    def __init__(self, catalog_name: str = "verdict_dev", spark: SparkSession | None = None):
         """
         Initialize catalog setup.
 
@@ -95,8 +95,8 @@ class VerdictCatalogSetup:
                     prompt STRING NOT NULL,
                     ground_truth STRING,
                     metadata MAP<STRING, STRING>,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP
                 )
                 USING DELTA
                 TBLPROPERTIES (
@@ -119,7 +119,7 @@ class VerdictCatalogSetup:
                     latency_ms DOUBLE,
                     status STRING,
                     error_message STRING,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+                    created_at TIMESTAMP,
                     run_id STRING
                 )
                 USING DELTA
@@ -144,7 +144,7 @@ class VerdictCatalogSetup:
                     metric_value DOUBLE,
                     metric_details STRING,
                     evaluator STRING,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+                    created_at TIMESTAMP
                 )
                 USING DELTA
                 TBLPROPERTIES (
@@ -174,7 +174,7 @@ class VerdictCatalogSetup:
                     baseline_version STRING,
                     baseline_mean DOUBLE,
                     p_value DOUBLE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+                    created_at TIMESTAMP
                 )
                 USING DELTA
                 TBLPROPERTIES (
