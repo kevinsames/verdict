@@ -17,7 +17,6 @@
 ### Option A: Azure AD Service Principal (Recommended for CI/CD)
 
 ```bash
-# Set environment variables
 export AZURE_TENANT_ID="your-tenant-id"
 export AZURE_CLIENT_ID="your-client-id"
 export AZURE_CLIENT_SECRET="your-client-secret"
@@ -36,47 +35,48 @@ export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
 
 ```bash
 # Deploy using Databricks Asset Bundles
-# Note: Uses git_source - no whl build required
 databricks bundle deploy -t development
 ```
 
-The bundle uses `git_source` to pull code directly from GitHub, so no wheel file needs to be built.
+The bundle uses `git_source` to pull code directly from GitHub:
+- No wheel file needs to be built
+- Notebooks add `src/` to `sys.path` for imports
+- Changes are picked up by re-running the job
 
 ## Step 3: Initialize Unity Catalog
 
-1. Go to your Azure Databricks workspace
-2. Navigate to **Workflows** > **verdict_pipeline**
-3. Run the `init_catalog` task
+Run the `init_catalog` notebook from the `verdict_pipeline` job.
 
-This creates the `verdict_dev` catalog with schemas:
-- `raw` - Source data (prompt_datasets, model_responses)
-- `evaluated` - Evaluation results
-- `metrics` - Aggregated metrics
+This creates:
+- **Catalog**: `verdict_dev`
+- **Schemas**: `raw`, `evaluated`, `metrics`
+- **Tables**: `prompt_datasets`, `model_responses`, `eval_results`, `metric_summary`
 
-**Note:** If catalog creation fails (e.g., requires managed location), create the catalog manually via Databricks UI, then re-run init_catalog to create schemas and tables.
+**Troubleshooting:**
+If catalog creation fails with "storage location required", create the catalog manually:
+1. Go to **Catalog** → **Create Catalog**
+2. Provide a managed location
+3. Re-run `init_catalog` to create schemas and tables
 
 ## Step 4: Create Sample Dataset
 
-Run the `notebooks/create_sample_dataset.ipynb` notebook to create a test dataset.
+Run `notebooks/create_sample_dataset.ipynb` to create test data.
 
-Or create your own dataset:
-
+Or programmatically:
 ```python
 from verdict.data.prompt_dataset import PromptDatasetManager
 
 manager = PromptDatasetManager(catalog_name="verdict_dev")
 manager.create_dataset(
-    prompts=[
-        {"prompt": "Your question?", "ground_truth": "Expected answer"}
-    ],
+    prompts=[{"prompt": "Question?", "ground_truth": "Answer"}],
     version="v1"
 )
 ```
 
 ## Step 5: Deploy Your Model
 
-1. Register your model in MLflow Model Registry
-2. Create a Model Serving endpoint via Databricks UI: **Compute** → **Serving** → **Create serving endpoint**
+1. Register model in MLflow Model Registry
+2. Create Model Serving endpoint via **Compute** → **Serving**
 
 Or via CLI:
 ```bash
@@ -96,7 +96,7 @@ databricks api post /api/2.0/serving-endpoints --json '{
 ## Step 6: Run the Pipeline
 
 ```bash
-# Run with default parameters
+# Run with defaults
 databricks bundle run verdict_pipeline -t development
 
 # Run with custom parameters
@@ -108,53 +108,72 @@ databricks bundle run verdict_pipeline -t development \
 
 ## Step 7: View Results
 
-### MLflow Experiments
-Navigate to **Experiments** > `/verdict/experiments`
-
-### Metric Tables
+### SQL Queries
 ```sql
--- View verdict history
+-- Verdict history
 SELECT * FROM verdict_dev.metrics.metric_summary ORDER BY created_at DESC;
 
--- View detailed results
+-- Detailed results
 SELECT * FROM verdict_dev.evaluated.eval_results WHERE run_id = '<run_id>';
+
+-- Model responses
+SELECT * FROM verdict_dev.raw.model_responses WHERE run_id = '<run_id>';
 ```
 
-## Configuration Options
+### MLflow Experiments
+Navigate to **Experiments** → `/verdict/experiments`
+
+## Configuration
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `model_endpoint` | Model Serving endpoint to evaluate | `databricks-gpt-oss-20b` |
-| `judge_endpoint` | LLM judge model for evaluation | `databricks-llama-4-maverick` |
 | `catalog_name` | Unity Catalog name | `verdict_dev` |
-| `threshold_pct` | Regression threshold percentage | `5.0` |
-| `p_value_threshold` | Statistical significance level | `0.05` |
+| `model_endpoint` | Model Serving endpoint | `databricks-gpt-oss-20b` |
+| `judge_endpoint` | LLM judge model | `databricks-llama-4-maverick` |
+| `dataset_version` | Prompt dataset version | `v1` |
+| `threshold_pct` | Regression threshold % | `5.0` |
+| `p_value_threshold` | Statistical significance | `0.05` |
 
 ## Data Operations
 
-Verdict uses **PySpark directly** for all Unity Catalog and Delta Lake operations. No databricks-sdk is required for data operations - everything uses native Spark SQL through `spark.sql()`.
+Verdict uses **PySpark directly** for all data operations:
+- Unity Catalog: `spark.sql("CREATE CATALOG IF NOT EXISTS ...")`
+- Delta Lake: `spark.sql("CREATE TABLE IF NOT EXISTS ... USING DELTA")`
+- No databricks-sdk required for data operations
+
+## Deployment Targets
+
+| Target | Catalog | Root Path |
+|--------|---------|-----------|
+| `development` | `verdict_dev` | `/Users/{user}/verdict_dev` |
+| `staging` | `verdict_staging` | `/Shared/verdict_staging` |
+| `production` | `verdict` | `/Shared/verdict` |
 
 ## Troubleshooting
 
 ### Authentication Errors
 ```bash
-# Test connection
 databricks clusters list
 ```
 
-### Unity Catalog Permission Errors
+### Unity Catalog Permissions
 Ensure your user/service principal has:
-- `CREATE CATALOG` permission on metastore
-- `CREATE SCHEMA` permission on catalog
+- `CREATE CATALOG` on metastore
+- `CREATE SCHEMA` on catalog
 
 ### Model Serving Not Found
-Verify your endpoint is deployed and running:
 ```bash
 databricks serving-endpoints get my-model-endpoint
 ```
 
+### Notebook Import Errors
+Notebooks add `src/` to `sys.path`. If imports fail, verify:
+1. Job uses `git_source` pointing to correct branch
+2. Working directory is the repo root
+
 ## Next Steps
 
-1. Create Azure Key Vault secrets for webhook URLs
-2. Schedule the pipeline to run automatically
-3. Create Lakeview dashboards for monitoring
+1. Create Unity Catalog volume for testgen output: `/Volumes/verdict_dev/raw/testgen_output`
+2. Configure webhook secrets in Azure Key Vault
+3. Schedule pipeline runs
+4. Build Lakeview dashboards

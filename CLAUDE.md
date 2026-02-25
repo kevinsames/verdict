@@ -35,10 +35,16 @@ ruff check src/
 ruff format src/
 ```
 
+### Databricks Bundle
+```bash
+databricks bundle deploy -t development
+databricks bundle run verdict_pipeline -t development
+```
+
 ## Architecture
 
 ### Unity Catalog Structure
-- **Catalog**: `verdict`
+- **Catalog**: `verdict_dev` (development), `verdict` (production)
 - **Schemas**: `raw`, `evaluated`, `metrics`
 - **Tables**:
   - `raw.prompt_datasets` — versioned prompts with ground truth
@@ -67,22 +73,25 @@ prompt_datasets → inference_runner → model_responses → evaluator → eval_
 - **Delta writes**: Use `MERGE` for idempotency
 - **Type hints**: Required on all functions
 - **Docstrings**: Required on all functions
-- **Data operations**: Use PySpark with Delta Lake and Unity Catalog directly
+- **Data operations**: Use PySpark with Delta Lake and Unity Catalog directly (no databricks-sdk)
 - **Secrets**: Reference via `dbutils.secrets.get()` or Azure Key Vault — never hardcode
 - **Authentication**: Supports Azure AD tokens, Managed Identity, and PAT tokens
 - **Dual execution**: All scripts must run as both Azure Databricks notebook and Python module
 - **Logging**: Use Python's `logging` module throughout
 
+## Deployment
+
+- Uses **Databricks Asset Bundles** with `git_source` to pull code from GitHub
+- No wheel file builds required - notebooks use `sys.path` to import from `src/verdict`
+- Deploy with: `databricks bundle deploy -t development`
+
 ## Configuration
 
-Central config in `config/config.yaml`:
-- Catalog/schema names
-- Model endpoint URLs
-- Judge model endpoint
-- Regression thresholds per metric
-- MLflow experiment path
-- Alert webhook URL
-- Azure authentication settings
+| Parameter | Default |
+|-----------|---------|
+| `catalog_name` | `verdict_dev` |
+| `model_endpoint` | `databricks-gpt-oss-20b` |
+| `judge_endpoint` | `databricks-llama-4-maverick` |
 
 ## Azure Databricks Setup
 

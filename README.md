@@ -12,7 +12,7 @@ Verdict is an automated system that evaluates LLM outputs at scale, tracks quali
 - **Automated Alerts**: Email/webhook notifications on quality regressions
 - **Full Governance**: Unity Catalog integration with Delta Lake storage
 - **Azure Native**: Supports Azure AD, Managed Identity, and Azure Key Vault integration
-- **RAG Test Dataset Generator**: Generate synthetic Q&A pairs from Qdrant vector database for RAG evaluation
+- **RAG Test Dataset Generator**: Generate synthetic Q&A pairs from Qdrant vector database
 
 ## Architecture
 
@@ -60,10 +60,8 @@ export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
 
 **Option A: Azure AD Service Principal (Recommended)**
 ```bash
-# Create a Service Principal in Azure AD
 az ad sp create-for-rbac --name "verdict-sp" --role Contributor
 
-# Set environment variables
 export AZURE_TENANT_ID="<tenant-id>"
 export AZURE_CLIENT_ID="<client-id>"
 export AZURE_CLIENT_SECRET="<client-secret>"
@@ -71,14 +69,13 @@ export AZURE_CLIENT_SECRET="<client-secret>"
 
 **Option B: Personal Access Token**
 ```bash
-# Generate PAT from Databricks workspace -> User Settings -> Developer
 export DATABRICKS_TOKEN="dapi..."
 ```
 
 ### 3. Deploy to Azure Databricks
 
 ```bash
-# Deploy using Databricks Asset Bundles (uses git source, no whl build needed)
+# Uses git_source - no wheel build required
 databricks bundle deploy -t development
 ```
 
@@ -86,23 +83,21 @@ databricks bundle deploy -t development
 
 Run the `init_catalog` notebook to create the `verdict_dev` catalog, schemas, and tables.
 
+**Note:** If catalog creation fails (requires managed location), create it manually via Databricks UI, then re-run init_catalog.
+
 ### 5. Run the Pipeline
 
 ```bash
-# Run via CLI
 databricks bundle run verdict_pipeline -t development
 ```
-
-Or via Databricks UI:
-1. Go to **Workflows**
-2. Find "Verdict: LLM Evaluation Pipeline"
-3. Click **Run Now**
 
 ## Project Structure
 
 ```
 verdict/
 ├── databricks.yml               # Databricks Asset Bundle config
+├── orchestration/
+│   └── verdict_workflow.yaml    # Job definition (imported by databricks.yml)
 ├── notebooks/                   # Databricks notebooks (.ipynb)
 │   ├── init_catalog.ipynb       # Unity Catalog setup
 │   ├── create_sample_dataset.ipynb
@@ -118,11 +113,18 @@ verdict/
 │   ├── evaluation/              # Evaluation modules
 │   ├── testgen/                 # RAG test dataset generator
 │   └── regression/              # Regression detection
-├── orchestration/               # Workflow definitions
-│   └── verdict_workflow.yaml    # Job definition
 ├── pyproject.toml               # Python package config
 └── requirements.txt             # Dependencies
 ```
+
+## Unity Catalog Schema
+
+| Schema | Table | Description |
+|--------|-------|-------------|
+| `raw` | `prompt_datasets` | Versioned prompts with ground truth |
+| `raw` | `model_responses` | Inference outputs with metadata |
+| `evaluated` | `eval_results` | Per-response metric scores |
+| `metrics` | `metric_summary` | Aggregated metrics per model version |
 
 ## Verdict Labels
 
@@ -148,50 +150,24 @@ verdict/
 - Response Length
 - Latency (p50/p95)
 
-## Requirements
+## Configuration
 
-- Azure Databricks Runtime 14.0+
-- Unity Catalog enabled
-- Model Serving endpoints deployed
-- Python 3.10+
-- Azure AD authentication (recommended) or PAT token
-
-## Azure Authentication
-
-Verdict supports multiple authentication methods for Azure Databricks:
-
-### 1. Azure AD Service Principal (Recommended)
-```bash
-export AZURE_TENANT_ID="your-tenant-id"
-export AZURE_CLIENT_ID="your-client-id"
-export AZURE_CLIENT_SECRET="your-client-secret"
-export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
-```
-
-### 2. Managed Identity
-Automatically used when running on Azure VMs, AKS, or Azure Functions.
-
-### 3. PAT Token
-```bash
-export DATABRICKS_TOKEN="your-personal-access-token"
-export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
-```
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `catalog_name` | Unity Catalog name | `verdict_dev` |
+| `model_endpoint` | Model Serving endpoint | `databricks-gpt-oss-20b` |
+| `judge_endpoint` | LLM judge model | `databricks-llama-4-maverick` |
+| `threshold_pct` | Regression threshold % | `5.0` |
+| `p_value_threshold` | Statistical significance | `0.05` |
 
 ## RAG Test Dataset Generator
 
-The `verdict-testgen` module generates synthetic test datasets from Qdrant vector database for RAG evaluation.
-
-### Installation
-
-```bash
-pip install verdict[testgen]
-```
+Generates synthetic Q&A test datasets from Qdrant vector database.
 
 ### Usage
 
-**CLI:**
 ```bash
-# Set required environment variables
+# Set environment variables
 export QDRANT_COLLECTION="documents"
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 export AZURE_OPENAI_API_KEY="your-api-key"
@@ -203,26 +179,23 @@ verdict-testgen --collection documents --limit 100
 verdict-testgen --collection documents --load-to-catalog --dataset-version v1
 ```
 
-**Python API:**
-```python
-from verdict.testgen import Settings, TestDatasetGenerator
+### Output
 
-settings = Settings(
-    qdrant_collection="documents",
-    qdrant_url="http://localhost:6333",
-    qdrant_scroll_limit=100,
-)
+Files written to `/Volumes/verdict_dev/raw/testgen_output/`:
+- `qa_pairs.jsonl` — Question-answer pairs
+- `retrieval_eval.jsonl` — Retrieval evaluation format
+- `rag_eval.jsonl` — RAG evaluation format
 
-generator = TestDatasetGenerator(settings)
-result = generator.generate()
+## Requirements
 
-# Load to Unity Catalog
-generator.load_to_catalog(
-    qa_pairs=result["qa_pairs_data"],
-    version="v1",
-    catalog_name="verdict_dev",
-)
-```
+- Azure Databricks Runtime 14.0+
+- Unity Catalog enabled
+- Model Serving endpoints deployed
+- Python 3.10+
+
+## Data Operations
+
+Verdict uses **PySpark directly** for all Unity Catalog and Delta Lake operations. No databricks-sdk is required — everything uses native Spark SQL through `spark.sql()`.
 
 ## License
 
