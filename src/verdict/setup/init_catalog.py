@@ -30,14 +30,30 @@ class VerdictCatalogSetup:
         self.spark = spark or SparkSession.builder.getOrCreate()
         self.schemas = ["raw", "evaluated", "metrics"]
 
+    def catalog_exists(self) -> bool:
+        """Check if the catalog already exists."""
+        try:
+            catalogs = self.spark.sql("SHOW CATALOGS").collect()
+            return any(row.catalog == self.catalog_name for row in catalogs)
+        except Exception:
+            return False
+
     def create_catalog(self) -> None:
         """Create the verdict catalog if it doesn't exist."""
+        # Check if catalog exists first to avoid storage location errors
+        if self.catalog_exists():
+            logger.info(f"Catalog '{self.catalog_name}' already exists, skipping creation")
+            return
+
         try:
-            self.spark.sql(f"CREATE CATALOG IF NOT EXISTS {self.catalog_name}")
-            logger.info(f"Catalog '{self.catalog_name}' created or already exists")
+            self.spark.sql(f"CREATE CATALOG {self.catalog_name}")
+            logger.info(f"Created catalog '{self.catalog_name}'")
         except Exception as e:
-            logger.error(f"Failed to create catalog '{self.catalog_name}': {e}")
-            raise
+            logger.warning(
+                f"Could not create catalog '{self.catalog_name}': {e}\n"
+                "Please create the catalog manually via Databricks UI if needed.\n"
+                "Continuing with schema and table setup..."
+            )
 
     def create_schemas(self) -> None:
         """Create schemas within the catalog."""
