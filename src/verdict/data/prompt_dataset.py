@@ -32,7 +32,7 @@ class PromptDatasetManager:
 
     def __init__(
         self,
-        catalog_name: str = "verdict",
+        catalog_name: str = "verdict_dev",
         spark: Optional[SparkSession] = None
     ):
         """

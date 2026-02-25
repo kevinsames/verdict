@@ -28,7 +28,7 @@ variables:
 
   catalog_name:
     description: "Unity Catalog name"
-    default: "verdict"
+    default: "verdict_dev"
 
   judge_endpoint:
     description: "LLM judge model endpoint"

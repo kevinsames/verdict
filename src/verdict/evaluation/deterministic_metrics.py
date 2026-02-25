@@ -141,7 +141,7 @@ def compute_token_count(response: Optional[str]) -> int:
 class DeterministicMetricsCalculator:
     """Calculates deterministic metrics for model responses."""
 
-    def __init__(self, catalog_name: str = "verdict", spark: Optional[SparkSession] = None):
+    def __init__(self, catalog_name: str = "verdict_dev", spark: Optional[SparkSession] = None):
         """
         Initialize metrics calculator.
 
@@ -250,7 +250,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Calculate deterministic metrics")
     parser.add_argument("--responses-table", required=True, help="Model responses table")
     parser.add_argument("--run-id", help="Filter by run ID")
-    parser.add_argument("--catalog", default="verdict", help="Catalog name")
+    parser.add_argument("--catalog", default="verdict_dev", help="Catalog name")
 
     args = parser.parse_args()
 

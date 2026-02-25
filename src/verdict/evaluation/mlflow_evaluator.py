@@ -34,7 +34,7 @@ class MLflowEvaluator:
 
     def __init__(
         self,
-        catalog_name: str = "verdict",
+        catalog_name: str = "verdict_dev",
         experiment_path: str = "/verdict/experiments",
         spark: Optional[SparkSession] = None
     ):
@@ -236,7 +236,7 @@ def main() -> None:
     parser.add_argument("--run-id", help="Filter by run ID")
     parser.add_argument("--metrics", nargs="+", default=["faithfulness", "answer_relevance"])
     parser.add_argument("--sample-size", type=int, help="Sample size limit")
-    parser.add_argument("--catalog", default="verdict", help="Catalog name")
+    parser.add_argument("--catalog", default="verdict_dev", help="Catalog name")
     parser.add_argument("--experiment", default="/verdict/experiments", help="MLflow experiment path")
 
     args = parser.parse_args()

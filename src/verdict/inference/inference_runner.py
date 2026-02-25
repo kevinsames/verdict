@@ -35,7 +35,7 @@ class InferenceRunner:
 
     def __init__(
         self,
-        catalog_name: str = "verdict",
+        catalog_name: str = "verdict_dev",
         spark: Optional[SparkSession] = None
     ):
         """
@@ -372,7 +372,7 @@ def main() -> None:
     parser.add_argument("--run-id", help="MLflow run ID")
     parser.add_argument("--batch-size", type=int, default=100, help="Batch size")
     parser.add_argument("--max-workers", type=int, default=10, help="Max parallel workers")
-    parser.add_argument("--catalog", default="verdict", help="Catalog name")
+    parser.add_argument("--catalog", default="verdict_dev", help="Catalog name")
 
     args = parser.parse_args()
 

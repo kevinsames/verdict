@@ -214,8 +214,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Initialize Verdict Unity Catalog")
     parser.add_argument(
         "--catalog",
-        default="verdict",
-        help="Catalog name (default: verdict)"
+        default="verdict_dev",
+        help="Catalog name (default: verdict_dev)"
     )
     parser.add_argument(
         "--drop",

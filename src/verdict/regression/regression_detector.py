@@ -36,7 +36,7 @@ class RegressionDetector:
 
     def __init__(
         self,
-        catalog_name: str = "verdict",
+        catalog_name: str = "verdict_dev",
         threshold_pct: float = 5.0,
         p_value_threshold: float = 0.05,
         experiment_path: str = "/verdict/experiments",
@@ -379,7 +379,7 @@ def main() -> None:
     parser.add_argument("--run-id", help="Evaluation run ID")
     parser.add_argument("--threshold", type=float, default=5.0, help="Regression threshold %%")
     parser.add_argument("--p-value", type=float, default=0.05, help="P-value threshold")
-    parser.add_argument("--catalog", default="verdict", help="Catalog name")
+    parser.add_argument("--catalog", default="verdict_dev", help="Catalog name")
 
     args = parser.parse_args()
 

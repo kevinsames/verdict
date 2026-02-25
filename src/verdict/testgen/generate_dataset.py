@@ -134,7 +134,7 @@ class TestDatasetGenerator:
         self,
         qa_pairs: list[dict[str, Any]],
         version: str,
-        catalog_name: str = "verdict",
+        catalog_name: str = "verdict_dev",
     ) -> int:
         """
         Load generated Q&A pairs into Unity Catalog.
@@ -218,8 +218,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--catalog",
-        default="verdict",
-        help="Catalog name (default: verdict)",
+        default="verdict_dev",
+        help="Catalog name (default: verdict_dev)",
     )
 
     args = parser.parse_args()

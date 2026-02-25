@@ -259,7 +259,7 @@ class LLMJudgeEvaluator:
 
     def __init__(
         self,
-        catalog_name: str = "verdict",
+        catalog_name: str = "verdict_dev",
         judge_endpoint: str = "databricks-llama-4-maverick",
         spark: Optional[SparkSession] = None,
         max_workers: int = 10
@@ -371,7 +371,7 @@ def main() -> None:
     parser.add_argument("--run-id", help="Filter by run ID")
     parser.add_argument("--judge-endpoint", default="databricks-llama-4-maverick", help="Judge model endpoint")
     parser.add_argument("--sample-size", type=int, help="Sample size limit")
-    parser.add_argument("--catalog", default="verdict", help="Catalog name")
+    parser.add_argument("--catalog", default="verdict_dev", help="Catalog name")
 
     args = parser.parse_args()
 
