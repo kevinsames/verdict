@@ -75,7 +75,7 @@ resources:
         - task_key: init_catalog
           description: "Initialize Unity Catalog tables"
           notebook_task:
-            notebook_path: notebooks/init_catalog.py
+            notebook_path: notebooks/init_catalog.ipynb
           new_cluster:
             spark_version: 14.3.x-scala2.12
             node_type_id: Standard_D4ds_v5
@@ -94,7 +94,7 @@ resources:
           depends_on:
             - task_key: init_catalog
           notebook_task:
-            notebook_path: notebooks/run_inference.py
+            notebook_path: notebooks/run_inference.ipynb
             base_parameters:
               model_endpoint: "{{job.parameters.model_endpoint}}"
               dataset_version: "{{job.parameters.dataset_version}}"
@@ -122,7 +122,7 @@ resources:
           depends_on:
             - task_key: init_catalog
           notebook_task:
-            notebook_path: notebooks/run_testgen.py
+            notebook_path: notebooks/run_testgen.ipynb
             base_parameters:
               qdrant_collection: ${var.qdrant_collection}
               qdrant_url: ${var.qdrant_url}
@@ -150,7 +150,7 @@ resources:
           depends_on:
             - task_key: inference
           notebook_task:
-            notebook_path: notebooks/run_evaluation.py
+            notebook_path: notebooks/run_evaluation.ipynb
             base_parameters:
               candidate_version: "{{job.parameters.candidate_version}}"
               judge_endpoint: ${var.judge_endpoint}
@@ -177,7 +177,7 @@ resources:
           depends_on:
             - task_key: evaluation
           notebook_task:
-            notebook_path: notebooks/run_regression.py
+            notebook_path: notebooks/run_regression.ipynb
             base_parameters:
               candidate_version: "{{job.parameters.candidate_version}}"
               baseline_version: "{{job.parameters.baseline_version}}"
@@ -201,7 +201,7 @@ resources:
           depends_on:
             - task_key: regression
           notebook_task:
-            notebook_path: notebooks/send_alert.py
+            notebook_path: notebooks/send_alert.ipynb
             base_parameters:
               verdict_task: regression
               webhook_secret: verdict/alerts_webhook
