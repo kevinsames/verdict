@@ -67,7 +67,7 @@ prompt_datasets → inference_runner → model_responses → evaluator → eval_
 - **Delta writes**: Use `MERGE` for idempotency
 - **Type hints**: Required on all functions
 - **Docstrings**: Required on all functions
-- **API calls**: Use `databricks-sdk` with Azure AD authentication
+- **Data operations**: Use PySpark with Delta Lake and Unity Catalog directly
 - **Secrets**: Reference via `dbutils.secrets.get()` or Azure Key Vault — never hardcode
 - **Authentication**: Supports Azure AD tokens, Managed Identity, and PAT tokens
 - **Dual execution**: All scripts must run as both Azure Databricks notebook and Python module

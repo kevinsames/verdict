@@ -85,27 +85,24 @@ manager.create_dataset(
 ## Step 5: Deploy Your Model
 
 1. Register your model in MLflow Model Registry
-2. Create a Model Serving endpoint:
+2. Create a Model Serving endpoint using the Databricks CLI:
 
-```python
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.serving import EndpointCoreConfigInput, ServedModelInput
-
-w = WorkspaceClient()
-w.serving_endpoints.create(
-    name="my-model-endpoint",
-    config=EndpointCoreConfigInput(
-        served_models=[
-            ServedModelInput(
-                model_name="my-model",
-                model_version="1",
-                scale_to_zero_enabled=True,
-                workload_size="Small"
-            )
-        ]
-    )
-)
+```bash
+# Create serving endpoint
+databricks api post /api/2.0/serving-endpoints --json '{
+  "name": "my-model-endpoint",
+  "config": {
+    "served_models": [{
+      "model_name": "my-model",
+      "model_version": "1",
+      "scale_to_zero_enabled": true,
+      "workload_size": "Small"
+    }]
+  }
+}'
 ```
+
+Or via the Databricks UI: **Serving** → **Create serving endpoint**
 
 ## Step 6: Run the Pipeline
 

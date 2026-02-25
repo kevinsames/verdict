@@ -2,65 +2,53 @@
 Unity Catalog initialization for Verdict.
 
 Creates the catalog, schemas, and Delta tables required for the
-LLMOps evaluation framework.
+LLMOps evaluation framework using PySpark directly.
 
 Can be run as a Databricks notebook or Python module.
 """
 
 import logging
-from typing import Optional
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import CreateTable
-from databricks.sdk.errors import NotFound
+from pyspark.sql import SparkSession
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class VerdictCatalogSetup:
-    """Manages Unity Catalog setup for Verdict."""
+    """Manages Unity Catalog setup for Verdict using PySpark."""
 
-    def __init__(self, catalog_name: str = "verdict", ws: Optional[WorkspaceClient] = None):
+    def __init__(self, catalog_name: str = "verdict", spark: SparkSession | None = None):
         """
         Initialize catalog setup.
 
         Args:
             catalog_name: Name of the Unity Catalog catalog.
-            ws: Databricks WorkspaceClient instance (creates one if not provided).
+            spark: SparkSession instance (creates one if not provided).
         """
         self.catalog_name = catalog_name
-        self.ws = ws or WorkspaceClient()
+        self.spark = spark or SparkSession.builder.getOrCreate()
         self.schemas = ["raw", "evaluated", "metrics"]
 
     def create_catalog(self) -> None:
         """Create the verdict catalog if it doesn't exist."""
         try:
-            self.ws.catalogs.get(self.catalog_name)
-            logger.info(f"Catalog '{self.catalog_name}' already exists")
-        except NotFound:
-            logger.info(f"Creating catalog '{self.catalog_name}'")
-            self.ws.catalogs.create(
-                name=self.catalog_name,
-                comment="Verdict LLMOps Evaluation Framework"
-            )
-            logger.info(f"Created catalog '{self.catalog_name}'")
+            self.spark.sql(f"CREATE CATALOG IF NOT EXISTS {self.catalog_name}")
+            logger.info(f"Catalog '{self.catalog_name}' created or already exists")
+        except Exception as e:
+            logger.error(f"Failed to create catalog '{self.catalog_name}': {e}")
+            raise
 
     def create_schemas(self) -> None:
         """Create schemas within the catalog."""
         for schema_name in self.schemas:
             full_name = f"{self.catalog_name}.{schema_name}"
             try:
-                self.ws.schemas.get(full_name)
-                logger.info(f"Schema '{full_name}' already exists")
-            except NotFound:
-                logger.info(f"Creating schema '{full_name}'")
-                self.ws.schemas.create(
-                    name=schema_name,
-                    catalog_name=self.catalog_name,
-                    comment=f"Verdict {schema_name} data"
-                )
-                logger.info(f"Created schema '{full_name}'")
+                self.spark.sql(f"CREATE SCHEMA IF NOT EXISTS {full_name}")
+                logger.info(f"Schema '{full_name}' created or already exists")
+            except Exception as e:
+                logger.error(f"Failed to create schema '{full_name}': {e}")
+                raise
 
     def create_tables(self) -> None:
         """Create Delta tables for Verdict."""
@@ -70,25 +58,11 @@ class VerdictCatalogSetup:
             full_name = f"{self.catalog_name}.{table_name}"
             logger.info(f"Creating/updating table '{full_name}'")
             try:
-                self.ws.statement_execution.execute_statement(
-                    statement=ddl,
-                    warehouse_id=self._get_warehouse_id()
-                )
+                self.spark.sql(ddl)
                 logger.info(f"Created table '{full_name}'")
             except Exception as e:
                 logger.error(f"Failed to create table '{full_name}': {e}")
                 raise
-
-    def _get_warehouse_id(self) -> str:
-        """Get or create a SQL warehouse for DDL execution."""
-        warehouses = list(self.ws.warehouses.list())
-        if not warehouses:
-            raise RuntimeError("No SQL warehouses available. Please create one.")
-        # Use the first running warehouse
-        for wh in warehouses:
-            if wh.state == "RUNNING":
-                return wh.id
-        return warehouses[0].id
 
     def _get_table_definitions(self) -> dict[str, str]:
         """
@@ -206,6 +180,16 @@ class VerdictCatalogSetup:
         self.create_tables()
         logger.info("Verdict catalog setup complete!")
 
+    def drop_all(self) -> None:
+        """Drop all Verdict catalog objects (use with caution!)."""
+        logger.warning(f"Dropping catalog '{self.catalog_name}' and all its objects...")
+        try:
+            self.spark.sql(f"DROP CATALOG IF EXISTS {self.catalog_name} CASCADE")
+            logger.info(f"Catalog '{self.catalog_name}' dropped")
+        except Exception as e:
+            logger.error(f"Failed to drop catalog: {e}")
+            raise
+
 
 def main() -> None:
     """Main entry point for catalog setup."""
@@ -217,18 +201,21 @@ def main() -> None:
         default="verdict",
         help="Catalog name (default: verdict)"
     )
+    parser.add_argument(
+        "--drop",
+        action="store_true",
+        help="Drop catalog before creating (WARNING: destroys all data)"
+    )
     args = parser.parse_args()
 
-    setup = VerdictCatalogSetup(catalog_name=args.catalog)
+    spark = SparkSession.builder.getOrCreate()
+    setup = VerdictCatalogSetup(catalog_name=args.catalog, spark=spark)
+
+    if args.drop:
+        setup.drop_all()
+
     setup.run_setup()
 
 
 if __name__ == "__main__":
-    # Support running as Databricks notebook
-    try:
-        from dbutils import DBUtils  # type: ignore
-        dbutils = DBUtils()
-    except ImportError:
-        dbutils = None  # Running as module, not notebook
-
     main()
