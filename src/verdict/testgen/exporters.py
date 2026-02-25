@@ -25,7 +25,15 @@ class DatasetExporter:
 
     def __init__(self, output_dir: str) -> None:
         self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Try to create directory, but continue if it fails (e.g., Unity Catalog volume)
+        try:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            logger.warning(
+                f"Could not create directory {self.output_dir}: {e}. "
+                "If using Unity Catalog volume, ensure it exists via SQL: "
+                "CREATE VOLUME IF NOT EXISTS verdict_dev.raw.testgen_output"
+            )
         logger.info(f"Output directory: {self.output_dir}")
 
     def export_qa_pairs(

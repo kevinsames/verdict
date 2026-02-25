@@ -51,6 +51,7 @@ This creates:
 - **Catalog**: `verdict_dev`
 - **Schemas**: `raw`, `evaluated`, `metrics`
 - **Tables**: `prompt_datasets`, `model_responses`, `eval_results`, `metric_summary`
+- **Volume**: `raw.testgen_output` (for RAG test dataset generator output)
 
 **Troubleshooting:**
 If catalog creation fails with "storage location required", create the catalog manually:
@@ -173,7 +174,6 @@ Notebooks add `src/` to `sys.path`. If imports fail, verify:
 
 ## Next Steps
 
-1. Create Unity Catalog volume for testgen output: `/Volumes/verdict_dev/raw/testgen_output`
-2. Configure webhook secrets in Azure Key Vault
-3. Schedule pipeline runs
-4. Build Lakeview dashboards
+1. Configure webhook secrets in Azure Key Vault
+2. Schedule pipeline runs
+3. Build Lakeview dashboards

@@ -80,6 +80,21 @@ class VerdictCatalogSetup:
                 logger.error(f"Failed to create table '{full_name}': {e}")
                 raise
 
+    def create_volumes(self) -> None:
+        """Create Unity Catalog volumes for Verdict."""
+        volumes = [
+            f"{self.catalog_name}.raw.testgen_output",
+        ]
+
+        for volume_name in volumes:
+            logger.info(f"Creating volume '{volume_name}'")
+            try:
+                self.spark.sql(f"CREATE VOLUME IF NOT EXISTS {volume_name}")
+                logger.info(f"Volume '{volume_name}' created or already exists")
+            except Exception as e:
+                logger.error(f"Failed to create volume '{volume_name}': {e}")
+                raise
+
     def _get_table_definitions(self) -> dict[str, str]:
         """
         Get DDL statements for all Verdict tables.
@@ -194,6 +209,7 @@ class VerdictCatalogSetup:
         self.create_catalog()
         self.create_schemas()
         self.create_tables()
+        self.create_volumes()
         logger.info("Verdict catalog setup complete!")
 
     def drop_all(self) -> None:
