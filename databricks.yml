@@ -42,12 +42,6 @@ variables:
     description: "Qdrant server URL"
     default: "http://localhost:6333"
 
-artifacts:
-  verdict_wheel:
-    type: whl
-    path: .
-    build: "pip wheel --no-deps -w dist ."
-
 resources:
   jobs:
     verdict_pipeline:
@@ -57,6 +51,11 @@ resources:
         project: verdict
         type: llmops
         platform: azure
+
+      git_source:
+        git_url: "https://github.com/kevinsames/verdict"
+        git_provider: github
+        git_branch: main
 
       parameters:
         - name: model_endpoint
@@ -84,8 +83,6 @@ resources:
             azure_attributes:
               first_on_demand: 1
               availability: ON_DEMAND_AZURE
-          libraries:
-            - whl: dist/verdict-*.whl
           timeout_seconds: 600
 
         # Task 2: Run Inference
@@ -109,7 +106,6 @@ resources:
               first_on_demand: 1
               availability: ON_DEMAND_AZURE
           libraries:
-            - whl: dist/verdict-*.whl
             - pypi:
                 package: azure-identity>=1.15.0
             - pypi:
@@ -137,11 +133,12 @@ resources:
               first_on_demand: 1
               availability: ON_DEMAND_AZURE
           libraries:
-            - whl: dist/verdict-*.whl
             - pypi:
                 package: qdrant-client>=1.7.0
             - pypi:
                 package: azure-identity>=1.15.0
+            - pypi:
+                package: pydantic-settings>=2.0.0
           timeout_seconds: 1800
 
         # Task 3: Run Evaluation
@@ -164,7 +161,6 @@ resources:
               first_on_demand: 1
               availability: ON_DEMAND_AZURE
           libraries:
-            - whl: dist/verdict-*.whl
             - pypi:
                 package: mlflow>=2.10.0
             - pypi:
@@ -191,8 +187,6 @@ resources:
             azure_attributes:
               first_on_demand: 1
               availability: ON_DEMAND_AZURE
-          libraries:
-            - whl: dist/verdict-*.whl
           timeout_seconds: 1800
 
         # Task 5: Deliver Verdict (Alert)
@@ -213,8 +207,6 @@ resources:
             azure_attributes:
               first_on_demand: 1
               availability: ON_DEMAND_AZURE
-          libraries:
-            - whl: dist/verdict-*.whl
           timeout_seconds: 300
 
       email_notifications:
