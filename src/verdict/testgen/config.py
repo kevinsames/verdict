@@ -70,8 +70,8 @@ class Settings(BaseSettings):
         description="Hard negatives per query"
     )
     output_dir: str = Field(
-        default="./output",
-        description="Output directory path"
+        default="/Volumes/verdict_dev/raw/testgen_output",
+        description="Output directory path (Unity Catalog volume)"
     )
     delay_between_calls: float = Field(
         default=0.5,

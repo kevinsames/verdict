@@ -35,45 +35,36 @@ export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
 ## Step 2: Deploy Verdict
 
 ```bash
-# Run the setup script
-chmod +x setup_azure.sh
-./setup_azure.sh
-```
-
-Or manually:
-
-```bash
-# Build the wheel
-pip install build
-python -m build --wheel
-
-# Validate configuration
-databricks bundle validate -t development
-
-# Deploy to Azure Databricks
+# Deploy using Databricks Asset Bundles
+# Note: Uses git_source - no whl build required
 databricks bundle deploy -t development
 ```
+
+The bundle uses `git_source` to pull code directly from GitHub, so no wheel file needs to be built.
 
 ## Step 3: Initialize Unity Catalog
 
 1. Go to your Azure Databricks workspace
 2. Navigate to **Workflows** > **verdict_pipeline**
-3. Run the `init_catalog` task (or run the full pipeline)
+3. Run the `init_catalog` task
 
-Or run the notebook directly:
-- Open `notebooks/init_catalog.py` in Databricks
-- Run all cells to create catalog, schemas, and tables
+This creates the `verdict_dev` catalog with schemas:
+- `raw` - Source data (prompt_datasets, model_responses)
+- `evaluated` - Evaluation results
+- `metrics` - Aggregated metrics
+
+**Note:** If catalog creation fails (e.g., requires managed location), create the catalog manually via Databricks UI, then re-run init_catalog to create schemas and tables.
 
 ## Step 4: Create Sample Dataset
 
-Run the `notebooks/create_sample_dataset.py` notebook to create a test dataset.
+Run the `notebooks/create_sample_dataset.ipynb` notebook to create a test dataset.
 
 Or create your own dataset:
 
 ```python
 from verdict.data.prompt_dataset import PromptDatasetManager
 
-manager = PromptDatasetManager(catalog_name="verdict")
+manager = PromptDatasetManager(catalog_name="verdict_dev")
 manager.create_dataset(
     prompts=[
         {"prompt": "Your question?", "ground_truth": "Expected answer"}
@@ -85,10 +76,10 @@ manager.create_dataset(
 ## Step 5: Deploy Your Model
 
 1. Register your model in MLflow Model Registry
-2. Create a Model Serving endpoint using the Databricks CLI:
+2. Create a Model Serving endpoint via Databricks UI: **Compute** → **Serving** → **Create serving endpoint**
 
+Or via CLI:
 ```bash
-# Create serving endpoint
 databricks api post /api/2.0/serving-endpoints --json '{
   "name": "my-model-endpoint",
   "config": {
@@ -101,8 +92,6 @@ databricks api post /api/2.0/serving-endpoints --json '{
   }
 }'
 ```
-
-Or via the Databricks UI: **Serving** → **Create serving endpoint**
 
 ## Step 6: Run the Pipeline
 
@@ -122,28 +111,28 @@ databricks bundle run verdict_pipeline -t development \
 ### MLflow Experiments
 Navigate to **Experiments** > `/verdict/experiments`
 
-### Dashboard
-Run the SQL queries in `dashboard/verdict_dashboard.sql` to create Lakeview dashboards
-
 ### Metric Tables
 ```sql
 -- View verdict history
-SELECT * FROM verdict.metrics.metric_summary ORDER BY created_at DESC;
+SELECT * FROM verdict_dev.metrics.metric_summary ORDER BY created_at DESC;
 
 -- View detailed results
-SELECT * FROM verdict.evaluated.eval_results WHERE run_id = '<run_id>';
+SELECT * FROM verdict_dev.evaluated.eval_results WHERE run_id = '<run_id>';
 ```
 
 ## Configuration Options
 
-Edit `config/config.yaml` or set parameters in the workflow:
-
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `model_endpoint` | Model Serving endpoint to evaluate | `your-model-endpoint` |
+| `model_endpoint` | Model Serving endpoint to evaluate | `databricks-gpt-oss-20b` |
 | `judge_endpoint` | LLM judge model for evaluation | `databricks-llama-4-maverick` |
+| `catalog_name` | Unity Catalog name | `verdict_dev` |
 | `threshold_pct` | Regression threshold percentage | `5.0` |
 | `p_value_threshold` | Statistical significance level | `0.05` |
+
+## Data Operations
+
+Verdict uses **PySpark directly** for all Unity Catalog and Delta Lake operations. No databricks-sdk is required for data operations - everything uses native Spark SQL through `spark.sql()`.
 
 ## Troubleshooting
 
@@ -167,6 +156,5 @@ databricks serving-endpoints get my-model-endpoint
 ## Next Steps
 
 1. Create Azure Key Vault secrets for webhook URLs
-2. Set up alerting in `config/config.yaml`
-3. Schedule the pipeline to run automatically
-4. Create Lakeview dashboards for monitoring
+2. Schedule the pipeline to run automatically
+3. Create Lakeview dashboards for monitoring

@@ -52,11 +52,7 @@ Verdict is an automated system that evaluates LLM outputs at scale, tracks quali
 git clone https://github.com/kevinsames/verdict.git
 cd verdict
 
-# Copy example config
-cp .databrickscfg.example ~/.databrickscfg
-
-# Edit with your workspace URL
-# Or set environment variables:
+# Set environment variables
 export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
 ```
 
@@ -82,29 +78,13 @@ export DATABRICKS_TOKEN="dapi..."
 ### 3. Deploy to Azure Databricks
 
 ```bash
-# Make setup script executable
-chmod +x setup_azure.sh
-
-# Run setup (validates config, builds package, deploys)
-./setup_azure.sh
-```
-
-Or manually:
-```bash
-# Build the wheel
-pip install build
-python -m build --wheel
-
-# Deploy using Databricks Asset Bundles
+# Deploy using Databricks Asset Bundles (uses git source, no whl build needed)
 databricks bundle deploy -t development
 ```
 
-### 4. Create Sample Dataset
+### 4. Initialize Unity Catalog
 
-Run the sample dataset notebook:
-1. Go to **Workspace** → **verdict_dev** → **notebooks**
-2. Open `create_sample_dataset.py`
-3. Click **Run All**
+Run the `init_catalog` notebook to create the `verdict_dev` catalog, schemas, and tables.
 
 ### 5. Run the Pipeline
 
@@ -117,35 +97,31 @@ Or via Databricks UI:
 1. Go to **Workflows**
 2. Find "Verdict: LLM Evaluation Pipeline"
 3. Click **Run Now**
-4. Set parameters:
-   - `model_endpoint`: Your model serving endpoint name
-   - `candidate_version`: Version to evaluate (e.g., "2")
-   - `baseline_version`: Version to compare against (e.g., "1")
-   - `dataset_version`: Dataset version (e.g., "v1")
 
 ## Project Structure
 
 ```
 verdict/
 ├── databricks.yml               # Databricks Asset Bundle config
-├── notebooks/                   # Databricks notebooks
-│   ├── init_catalog.py          # Unity Catalog setup
-│   ├── create_sample_dataset.py # Sample data creation
-│   ├── run_testgen.py           # RAG test dataset generation
-│   ├── run_inference.py         # Inference task
-│   ├── run_evaluation.py        # Evaluation task
-│   ├── run_regression.py        # Regression detection
-│   └── send_alert.py            # Alert task
+├── notebooks/                   # Databricks notebooks (.ipynb)
+│   ├── init_catalog.ipynb       # Unity Catalog setup
+│   ├── create_sample_dataset.ipynb
+│   ├── run_testgen.ipynb        # RAG test dataset generation
+│   ├── run_inference.ipynb      # Inference task
+│   ├── run_evaluation.ipynb     # Evaluation task
+│   ├── run_regression.ipynb     # Regression detection
+│   └── send_alert.ipynb         # Alert task
 ├── src/verdict/                 # Python package
-│   ├── setup/                   # Unity Catalog setup
+│   ├── setup/                   # Unity Catalog setup (PySpark)
 │   ├── data/                    # Prompt dataset management
 │   ├── inference/               # Parallel inference
 │   ├── evaluation/              # Evaluation modules
 │   ├── testgen/                 # RAG test dataset generator
 │   └── regression/              # Regression detection
-├── config/config.yaml           # Configuration
-├── dashboard/                   # SQL dashboard queries
-└── orchestration/               # Workflow definitions
+├── orchestration/               # Workflow definitions
+│   └── verdict_workflow.yaml    # Job definition
+├── pyproject.toml               # Python package config
+└── requirements.txt             # Dependencies
 ```
 
 ## Verdict Labels
@@ -161,11 +137,10 @@ verdict/
 ### Built-in (MLflow LLM Evaluate)
 - Faithfulness
 - Answer Relevance
-- Toxicity
 
 ### Custom LLM-as-a-Judge
 - 1-5 quality score with reasoning
-- Configurable judge model endpoint
+- Configurable judge model endpoint (default: `databricks-llama-4-maverick`)
 
 ### Deterministic
 - ROUGE-L
@@ -204,7 +179,7 @@ export DATABRICKS_HOST="https://adb-<workspace-id>.<random>.azuredatabricks.net"
 
 ## RAG Test Dataset Generator
 
-The `verdict-testgen` module generates synthetic test datasets from Qdrant vector database for RAG evaluation. It creates Q&A pairs with ground truth answers from your document chunks.
+The `verdict-testgen` module generates synthetic test datasets from Qdrant vector database for RAG evaluation.
 
 ### Installation
 
@@ -245,30 +220,9 @@ result = generator.generate()
 generator.load_to_catalog(
     qa_pairs=result["qa_pairs_data"],
     version="v1",
-    catalog_name="verdict",
+    catalog_name="verdict_dev",
 )
 ```
-
-### Output Formats
-
-The generator produces three output files:
-
-| File | Description |
-|------|-------------|
-| `qa_pairs.jsonl` | Question-answer pairs with chunk references |
-| `retrieval_eval.jsonl` | Retrieval evaluation format with hard negatives |
-| `rag_eval.jsonl` | RAG evaluation format for end-to-end testing |
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `QDRANT_COLLECTION` | Yes | Qdrant collection name |
-| `AZURE_OPENAI_ENDPOINT` | Yes | Azure OpenAI resource URL |
-| `AZURE_OPENAI_API_KEY` | Yes | Azure OpenAI API key |
-| `QDRANT_URL` | No | Qdrant server URL (default: `http://localhost:6333`) |
-| `QDRANT_API_KEY` | No | Qdrant Cloud API key |
-| `OUTPUT_DIR` | No | Output directory (default: `./output`) |
 
 ## License
 

@@ -7,7 +7,6 @@ azure-keyvault-secrets>=4.7.0
 
 # MLflow for LLM evaluation
 mlflow>=2.10.0
-mlflow[gateway]>=2.10.0
 
 # Data processing
 numpy>=1.24.0
@@ -18,22 +17,18 @@ scipy>=1.11.0
 
 # HTTP requests
 requests>=2.31.0
-urllib3>=2.0.0
 
 # Configuration
 pyyaml>=6.0
-python-dotenv>=1.0.0
 
 # NLP metrics (for ROUGE, etc.)
 rouge-score>=0.1.2
 
-# Development dependencies
-pytest>=7.4.0
-pytest-cov>=4.1.0
-mypy>=1.8.0
-ruff>=0.1.0
-black>=23.0.0
-
-# Type stubs
-types-PyYAML>=6.0.0
-types-requests>=2.31.0
+# Testgen dependencies
+qdrant-client>=1.9.0
+langchain>=0.2.0
+langchain-openai>=0.1.0
+openai>=1.30.0
+pydantic-settings>=2.0.0
+datasets>=2.19.0
+tqdm>=4.66.0
