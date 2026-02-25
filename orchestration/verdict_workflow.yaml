@@ -1,179 +1,184 @@
-# Verdict Workflow
-# Azure Databricks Workflow definition for end-to-end LLMOps evaluation
+# Verdict Pipeline Workflow
+# Azure Databricks workflow definition for end-to-end LLMOps evaluation
 #
-# Deploy with: databricks bundle deploy
-# Run with: databricks bundle run verdict_workflow
+# This file is imported by databricks.yml via `include`
 #
 # Azure Databricks VM types:
-# - Standard_DS3_v2: 4 vCPUs, 14GB RAM (general purpose)
-# - Standard_DS4_v2: 8 vCPUs, 28GB RAM (general purpose)
-# - Standard_E4ds_v4: 4 vCPUs, 32GB RAM (memory optimized)
-# - Standard_F4s_v2: 4 vCPUs, 8GB RAM (compute optimized)
-
-bundle:
-  name: verdict
-
-variables:
-  model_endpoint:
-    description: "Model Serving endpoint name"
-    default: "databricks-gpt-oss-20b"
-
-  baseline_version:
-    description: "Baseline model version for comparison"
-    default: "1"
-
-  candidate_version:
-    description: "Candidate model version to evaluate"
-    default: "2"
-
-  dataset_version:
-    description: "Prompt dataset version"
-    default: "v1"
-
-  catalog_name:
-    description: "Unity Catalog name"
-    default: "verdict"
-
-  judge_endpoint:
-    description: "LLM judge model endpoint"
-    default: "databricks-llama-4-maverick"
+# - Standard_D4ds_v5: 4 vCPUs, 16GB RAM (general purpose)
+# - Standard_E4ds_v5: 4 vCPUs, 32GB RAM (memory optimized)
 
 resources:
   jobs:
-    verdict_evaluation_job:
+    verdict_pipeline:
       name: "Verdict: LLM Evaluation Pipeline"
       description: "End-to-end LLM evaluation with regression detection"
       tags:
         project: verdict
         type: llmops
+        platform: azure
+
+      git_source:
+        git_url: "https://github.com/kevinsames/verdict"
+        git_provider: github
+        git_branch: main
 
       parameters:
         - name: model_endpoint
-          default: "${var.model_endpoint}"
+          default: ${var.model_endpoint}
         - name: baseline_version
-          default: "${var.baseline_version}"
+          default: ${var.baseline_version}
         - name: candidate_version
-          default: "${var.candidate_version}"
+          default: ${var.candidate_version}
         - name: dataset_version
-          default: "${var.dataset_version}"
+          default: ${var.dataset_version}
+        - name: catalog_name
+          default: ${var.catalog_name}
 
       tasks:
-        # Task 1: Run Inference
-        - task_key: inference
-          description: "Run inference on model endpoint"
-          python_wheel_task:
-            package_name: verdict
-            entry_point: inference
-          parameters:
-            - "--endpoint"
-            - "{{job.parameters.model_endpoint}}"
-            - "--dataset-version"
-            - "{{job.parameters.dataset_version}}"
-            - "--model-version"
-            - "{{job.parameters.candidate_version}}"
-            - "--catalog"
-            - "${var.catalog_name}"
+        # Task 1: Initialize Unity Catalog (run once)
+        - task_key: init_catalog
+          description: "Initialize Unity Catalog tables"
+          notebook_task:
+            notebook_path: notebooks/init_catalog.ipynb
           new_cluster:
-            spark_version: "14.3.x-scala2.12"
-            node_type_id: "Standard_DS4_v2"
-            num_workers: 2
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_D4ds_v5
+            num_workers: 1
+            data_security_mode: SINGLE_USER
             azure_attributes:
               first_on_demand: 1
-              availability: "ON_DEMAND_AZURE"
-              spot_bid_max_price: -1
-            spark_env_vars:
-              PYSPARK_PYTHON: "/databricks/python3/bin/python3"
+              availability: ON_DEMAND_AZURE
+          timeout_seconds: 600
+
+        # Task 2: Run Inference
+        - task_key: inference
+          description: "Run inference on model endpoint"
+          depends_on:
+            - task_key: init_catalog
+          notebook_task:
+            notebook_path: notebooks/run_inference.ipynb
+            base_parameters:
+              model_endpoint: "{{job.parameters.model_endpoint}}"
+              dataset_version: "{{job.parameters.dataset_version}}"
+              candidate_version: "{{job.parameters.candidate_version}}"
+              catalog_name: ${var.catalog_name}
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_D4ds_v5
+            num_workers: 2
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
           libraries:
-            - whl: ../dist/verdict-*.whl
+            - pypi:
+                package: azure-identity>=1.15.0
+            - pypi:
+                package: azure-keyvault-secrets>=4.7.0
           timeout_seconds: 3600
 
-        # Task 2: Run Evaluation
+        # Task 2a: Generate Test Dataset (optional)
+        - task_key: testgen
+          description: "Generate RAG test dataset from Qdrant"
+          depends_on:
+            - task_key: init_catalog
+          notebook_task:
+            notebook_path: notebooks/run_testgen.ipynb
+            base_parameters:
+              qdrant_collection: ${var.qdrant_collection}
+              qdrant_url: ${var.qdrant_url}
+              dataset_version: "{{job.parameters.dataset_version}}"
+              catalog_name: ${var.catalog_name}
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_D4ds_v5
+            num_workers: 1
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
+          libraries:
+            - pypi:
+                package: qdrant-client>=1.7.0
+            - pypi:
+                package: azure-identity>=1.15.0
+            - pypi:
+                package: pydantic-settings>=2.0.0
+          timeout_seconds: 1800
+
+        # Task 3: Run Evaluation
         - task_key: evaluation
           description: "Evaluate responses with MLflow and LLM judge"
           depends_on:
             - task_key: inference
-          python_wheel_task:
-            package_name: verdict
-            entry_point: evaluate
-          parameters:
-            - "--responses-table"
-            - "raw.model_responses"
-            - "--candidate-version"
-            - "{{job.parameters.candidate_version}}"
-            - "--judge-endpoint"
-            - "${var.judge_endpoint}"
-            - "--catalog"
-            - "${var.catalog_name}"
+          notebook_task:
+            notebook_path: notebooks/run_evaluation.ipynb
+            base_parameters:
+              candidate_version: "{{job.parameters.candidate_version}}"
+              judge_endpoint: ${var.judge_endpoint}
+              catalog_name: ${var.catalog_name}
           new_cluster:
-            spark_version: "14.3.x-scala2.12"
-            node_type_id: "Standard_DS4_v2"
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_E4ds_v5
             num_workers: 2
+            data_security_mode: SINGLE_USER
             azure_attributes:
               first_on_demand: 1
-              availability: "ON_DEMAND_AZURE"
-              spot_bid_max_price: -1
+              availability: ON_DEMAND_AZURE
           libraries:
-            - whl: ../dist/verdict-*.whl
+            - pypi:
+                package: mlflow>=2.10.0
+            - pypi:
+                package: azure-identity>=1.15.0
           timeout_seconds: 3600
 
-        # Task 3: Regression Detection
+        # Task 4: Regression Detection
         - task_key: regression
           description: "Detect regressions vs baseline"
           depends_on:
             - task_key: evaluation
-          python_wheel_task:
-            package_name: verdict
-            entry_point: regression
-          parameters:
-            - "--candidate"
-            - "{{job.parameters.candidate_version}}"
-            - "--baseline"
-            - "{{job.parameters.baseline_version}}"
-            - "--dataset-version"
-            - "{{job.parameters.dataset_version}}"
-            - "--catalog"
-            - "${var.catalog_name}"
-          existing_cluster_id: null  # Uses same cluster as evaluation
+          notebook_task:
+            notebook_path: notebooks/run_regression.ipynb
+            base_parameters:
+              candidate_version: "{{job.parameters.candidate_version}}"
+              baseline_version: "{{job.parameters.baseline_version}}"
+              dataset_version: "{{job.parameters.dataset_version}}"
+              catalog_name: ${var.catalog_name}
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_D4ds_v5
+            num_workers: 1
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
           timeout_seconds: 1800
 
-        # Task 4: Deliver Verdict (Alert)
+        # Task 5: Deliver Verdict (Alert)
         - task_key: alert
           description: "Send alert based on verdict"
           depends_on:
             - task_key: regression
-          python_wheel_task:
-            package_name: verdict
-            entry_point: alert
-          parameters:
-            - "--verdict-task"
-            - "regression"
-            - "--webhook-secret"
-            - "verdict/alerts_webhook"
+          notebook_task:
+            notebook_path: notebooks/send_alert.ipynb
+            base_parameters:
+              verdict_task: regression
+              webhook_secret: verdict/alerts_webhook
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_D4ds_v5
+            num_workers: 1
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
           timeout_seconds: 300
 
-      # Job-level email notifications
       email_notifications:
         on_failure:
-          - "verdict-alerts@example.com"
+          - verdict-alerts@example.com
         on_success:
-          - "verdict-alerts@example.com"
+          - verdict-alerts@example.com
 
-      # Schedule (optional - uncomment to enable)
-      # schedule:
-      #   quartz_cron_expression: "0 0 6 * * ?"  # Daily at 6 AM UTC
-      #   timezone_id: "UTC"
-      #   pause_status: "UNPAUSED"
-
-      # Git source for version control
-      git_source:
-        git_url: "https://github.com/kevinsames/verdict"
-        git_provider: "github"
-        git_branch: "main"
-
-targets:
-  production:
-    default: true
-    workspace:
-      host: "${DATABRICKS_HOST}"
-    variables:
-      catalog_name: "verdict"
+      queue:
+        enabled: true
