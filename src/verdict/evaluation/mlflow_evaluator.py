@@ -11,12 +11,20 @@ from datetime import datetime
 from typing import Optional
 
 import mlflow
-from mlflow.metrics.genai import EvaluationExample, answer_relevance, faithfulness, toxicity
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Import available MLflow genai metrics
+# Note: Available metrics depend on MLflow version
+try:
+    from mlflow.metrics.genai import EvaluationExample, answer_relevance, faithfulness
+    MLFLOW_GENAI_AVAILABLE = True
+except ImportError:
+    MLFLOW_GENAI_AVAILABLE = False
+    logger.warning("mlflow.metrics.genai not available. Some metrics will be disabled.")
 
 
 class MLflowEvaluator:
@@ -59,14 +67,21 @@ class MLflowEvaluator:
         Args:
             responses_df: DataFrame with 'response', 'prompt', 'prompt_id'.
             run_id: MLflow run ID to associate results with.
-            metrics: List of metrics to compute. Default: all built-in.
+            metrics: List of metrics to compute. Default: all available.
             sample_size: Optional sample size limit.
 
         Returns:
             DataFrame with evaluation results.
         """
         run_id = run_id or str(uuid.uuid4())
-        metrics = metrics or ["faithfulness", "answer_relevance", "toxicity"]
+        available_metrics = self._get_available_metrics()
+        metrics = metrics or list(available_metrics.keys())
+
+        # Filter to only available metrics
+        metrics = [m for m in metrics if m in available_metrics]
+        if not metrics:
+            logger.warning("No valid metrics available. Skipping MLflow evaluation.")
+            return self.spark.createDataFrame([], schema="eval_id string, response_id string, prompt_id string, model_version string, run_id string, metric_name string, metric_value double, metric_details string, evaluator string, created_at timestamp")
 
         logger.info(f"Starting MLflow evaluation for {len(responses_df.collect())} responses")
 
@@ -87,7 +102,7 @@ class MLflowEvaluator:
         })
 
         # Build metrics list
-        eval_metrics = self._build_metrics(metrics)
+        eval_metrics = self._build_metrics(metrics, available_metrics)
 
         # Run evaluation
         with mlflow.start_run(run_name=f"eval_{run_id[:8]}") as run:
@@ -124,23 +139,33 @@ class MLflowEvaluator:
 
         return results_df
 
-    def _build_metrics(self, metric_names: list[str]) -> list:
+    def _get_available_metrics(self) -> dict:
+        """Get dictionary of available MLflow genai metrics."""
+        metrics = {}
+        if MLFLOW_GENAI_AVAILABLE:
+            metrics["faithfulness"] = faithfulness
+            metrics["answer_relevance"] = answer_relevance
+        return metrics
+
+    def _build_metrics(self, metric_names: list[str], available_metrics: dict) -> list:
         """
         Build MLflow metric objects from names.
 
         Args:
             metric_names: List of metric names.
+            available_metrics: Dictionary of available metric functions.
 
         Returns:
             List of MLflow metric objects.
         """
-        metrics_map = {
-            "faithfulness": faithfulness(),
-            "answer_relevance": answer_relevance(),
-            "toxicity": toxicity()
-        }
-
-        return [metrics_map[name] for name in metric_names if name in metrics_map]
+        metrics = []
+        for name in metric_names:
+            if name in available_metrics:
+                try:
+                    metrics.append(available_metrics[name]())
+                except Exception as e:
+                    logger.warning(f"Failed to create metric '{name}': {e}")
+        return metrics
 
     def _process_results(
         self,
@@ -209,7 +234,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run MLflow LLM evaluation")
     parser.add_argument("--responses-table", required=True, help="Model responses table")
     parser.add_argument("--run-id", help="Filter by run ID")
-    parser.add_argument("--metrics", nargs="+", default=["faithfulness", "answer_relevance", "toxicity"])
+    parser.add_argument("--metrics", nargs="+", default=["faithfulness", "answer_relevance"])
     parser.add_argument("--sample-size", type=int, help="Sample size limit")
     parser.add_argument("--catalog", default="verdict", help="Catalog name")
     parser.add_argument("--experiment", default="/verdict/experiments", help="MLflow experiment path")
