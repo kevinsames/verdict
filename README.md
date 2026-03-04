@@ -13,18 +13,50 @@ Verdict is an automated system that evaluates LLM outputs at scale, tracks quali
 - **Full Governance**: Unity Catalog integration with Delta Lake storage
 - **Azure Native**: Supports Azure AD, Managed Identity, and Azure Key Vault integration
 - **RAG Test Dataset Generator**: Generate synthetic Q&A pairs from Qdrant vector database
+- **Run Context Pattern**: Centralized configuration and state via `metadata.pipeline_runs` table
 
 ## Architecture
 
+### Run Context Pattern
+
+All tasks read from and write to `metadata.pipeline_runs` instead of passing parameters:
+
+```python
+# In any notebook - get configuration
+from verdict.orchestration import RunContext
+
+ctx = RunContext.from_run_id(spark, catalog_name, run_id)
+config = ctx.get_config()
+
+model_endpoint = config["model_endpoint"]
+candidate_version = config["candidate_version"]
+
+# Store outputs for downstream tasks
+ctx.set_output("inference_run_id", inference_run_id)
+ctx.update_task_status("inference", "completed")
 ```
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     metadata.pipeline_runs                          │
+│              (Central run state & configuration)                    │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+       ┌───────────────────────┴───────────────────────┐
+       ▼                                               ▼
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│ Prompt Dataset  │ ──▶ │ Inference Runner │ ──▶ │ Model Responses │
+│   init_run      │ ──▶ │  init_catalog    │ ──▶ │   Inference     │
+│ (load config)   │     │  (create tables) │     │   Runner        │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
-        ▲                                                │
-        │                                                ▼
+                                                        │
+        ┌───────────────────────────────────────────────┤
+        │                                               │
+        ▼                                               ▼
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│    Testgen      │     │ Metric Summary   │ ◀── │ Regr. Detector  │
-│ (Qdrant → Q&A)  │     └─────────────────┘     └─────────────────┘
+│    Testgen      │     │ Regr. Detector   │ ◀── │   Evaluation    │
+│ (Qdrant → Q&A)  │     └──────────────────┘     └─────────────────┘
 └─────────────────┘             │                       │
                                 ▼                       ▼
                         ┌─────────────────┐     ┌──────────────────┐
@@ -95,26 +127,32 @@ databricks bundle run verdict_pipeline -t development
 
 ```
 verdict/
-├── databricks.yml               # Databricks Asset Bundle config
+├── config/                      # Environment-specific configs
+│   ├── base.yaml               # Shared defaults
+│   ├── development.yaml        # Dev environment
+│   ├── staging.yaml            # Staging environment
+│   └── production.yaml         # Production environment
+├── databricks.yml              # Databricks Asset Bundle config
 ├── orchestration/
-│   └── verdict_workflow.yaml    # Job definition (imported by databricks.yml)
-├── notebooks/                   # Databricks notebooks (.ipynb)
-│   ├── init_catalog.ipynb       # Unity Catalog setup
-│   ├── create_sample_dataset.ipynb
-│   ├── run_testgen.ipynb        # RAG test dataset generation
-│   ├── run_inference.ipynb      # Inference task
-│   ├── run_evaluation.ipynb     # Evaluation task
-│   ├── run_regression.ipynb     # Regression detection
-│   └── send_alert.ipynb         # Alert task
+│   └── verdict_workflow.yaml   # Job definition
+├── notebooks/                  # Databricks notebooks (.ipynb)
+│   ├── init_run.ipynb          # Initialize run record
+│   ├── init_catalog.ipynb      # Unity Catalog setup
+│   ├── run_inference.ipynb     # Inference task
+│   ├── run_evaluation.ipynb    # Evaluation task
+│   ├── run_regression.ipynb    # Regression detection
+│   ├── send_alert.ipynb        # Alert task
+│   └── run_testgen.ipynb       # RAG test dataset generation
 ├── src/verdict/                 # Python package
-│   ├── setup/                   # Unity Catalog setup (PySpark)
-│   ├── data/                    # Prompt dataset management
-│   ├── inference/               # Parallel inference
-│   ├── evaluation/              # Evaluation modules
-│   ├── testgen/                 # RAG test dataset generator
-│   └── regression/              # Regression detection
-├── pyproject.toml               # Python package config
-└── requirements.txt             # Dependencies
+│   ├── orchestration/          # Run context & config loader
+│   ├── setup/                  # Unity Catalog setup
+│   ├── data/                   # Prompt dataset management
+│   ├── inference/              # Parallel inference
+│   ├── evaluation/             # Evaluation modules
+│   ├── testgen/                # RAG test dataset generator
+│   └── regression/             # Regression detection
+├── pyproject.toml              # Python package config
+└── requirements.txt            # Dependencies
 ```
 
 ## Unity Catalog Schema
@@ -125,6 +163,25 @@ verdict/
 | `raw` | `model_responses` | Inference outputs with metadata |
 | `evaluated` | `eval_results` | Per-response metric scores |
 | `metrics` | `metric_summary` | Aggregated metrics per model version |
+| `metadata` | `pipeline_runs` | Run state, configuration, and outputs |
+
+## Configuration
+
+Configuration is managed via YAML files in `config/`:
+
+```yaml
+# config/development.yaml
+catalog_name: verdict_dev
+model_endpoint: databricks-gpt-oss-20b
+judge_endpoint: databricks-llama-4-maverick
+baseline_version: "1"
+candidate_version: "2"
+dataset_version: v1
+```
+
+Secrets (webhook URLs, API keys) are stored in Databricks Secret Scopes:
+- `verdict/alerts_webhook` - Webhook URL for alerts
+- `verdict/qdrant_api_key` - Qdrant API key (for testgen)
 
 ## Verdict Labels
 
@@ -149,16 +206,6 @@ verdict/
 - Exact Match
 - Response Length
 - Latency (p50/p95)
-
-## Configuration
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `catalog_name` | Unity Catalog name | `verdict_dev` |
-| `model_endpoint` | Model Serving endpoint | `databricks-gpt-oss-20b` |
-| `judge_endpoint` | LLM judge model | `databricks-llama-4-maverick` |
-| `threshold_pct` | Regression threshold % | `5.0` |
-| `p_value_threshold` | Statistical significance | `0.05` |
 
 ## RAG Test Dataset Generator
 

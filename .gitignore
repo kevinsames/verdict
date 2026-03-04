@@ -68,3 +68,15 @@ logs/
 
 # Databricks bundle
 .databricks-bundle/
+
+# MLflow
+mlflow.db
+mlruns/
+mlartifacts/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# MLflow local database
+mlflow.db
