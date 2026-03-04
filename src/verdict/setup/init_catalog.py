@@ -224,6 +224,28 @@ class VerdictCatalogSetup:
                     'delta.minWriterVersion' = '5'
                 )
                 COMMENT 'Pipeline run state and configuration tracking'
+            """,
+
+            "metadata.testgen_chunks": f"""
+                CREATE TABLE IF NOT EXISTS {self.catalog_name}.metadata.testgen_chunks (
+                    chunk_id STRING NOT NULL,
+                    dataset_version STRING NOT NULL,
+                    source_collection STRING NOT NULL,
+                    source_text STRING,
+                    chunk_metadata MAP<STRING, STRING>,
+                    qa_pairs_count INT,
+                    created_at TIMESTAMP NOT NULL,
+                    PRIMARY KEY (chunk_id, dataset_version)
+                )
+                USING DELTA
+                TBLPROPERTIES (
+                    'delta.autoOptimize.optimizeWrite' = 'true',
+                    'delta.autoOptimize.autoCompact' = 'true',
+                    'delta.columnMapping.mode' = 'name',
+                    'delta.minReaderVersion' = '2',
+                    'delta.minWriterVersion' = '5'
+                )
+                COMMENT 'Source chunks used for test dataset generation'
             """
         }
 

@@ -135,6 +135,8 @@ class TestDatasetGenerator:
         qa_pairs: list[dict[str, Any]],
         version: str,
         catalog_name: str = "verdict_dev",
+        chunks: list[dict[str, Any]] | None = None,
+        source_collection: str | None = None,
     ) -> int:
         """
         Load generated Q&A pairs into Unity Catalog.
@@ -143,12 +145,15 @@ class TestDatasetGenerator:
             qa_pairs: List of Q&A pair dicts.
             version: Dataset version string.
             catalog_name: Unity Catalog name.
+            chunks: Optional list of source chunks to save to metadata.
+            source_collection: Qdrant collection name (required if chunks provided).
 
         Returns:
             Number of prompts loaded.
         """
         try:
             from verdict.data.prompt_dataset import PromptDatasetManager
+            from verdict.testgen.chunks_metadata import TestgenChunksManager
         except ImportError:
             logger.error(
                 "Unity Catalog integration requires pyspark. "
@@ -157,6 +162,12 @@ class TestDatasetGenerator:
             return 0
 
         manager = PromptDatasetManager(catalog_name=catalog_name)
+
+        # Count Q&A pairs per chunk
+        qa_pairs_count: dict[str, int] = {}
+        for pair in qa_pairs:
+            chunk_id = pair.get("chunk_id", "unknown")
+            qa_pairs_count[chunk_id] = qa_pairs_count.get(chunk_id, 0) + 1
 
         # Transform Q&A pairs to prompt format
         prompts = [
@@ -173,6 +184,21 @@ class TestDatasetGenerator:
 
         count = manager.create_dataset(prompts=prompts, version=version)
         logger.info(f"Loaded {count} prompts into catalog as version '{version}'")
+
+        # Save chunks to metadata if provided
+        if chunks and source_collection:
+            try:
+                chunks_manager = TestgenChunksManager(catalog_name=catalog_name)
+                chunks_saved = chunks_manager.save_chunks(
+                    chunks=chunks,
+                    dataset_version=version,
+                    source_collection=source_collection,
+                    qa_pairs_count=qa_pairs_count,
+                )
+                logger.info(f"Saved {chunks_saved} source chunks to metadata")
+            except Exception as e:
+                logger.warning(f"Failed to save chunks to metadata: {e}")
+
         return count
 
 
