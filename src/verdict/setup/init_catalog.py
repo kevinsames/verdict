@@ -28,7 +28,7 @@ class VerdictCatalogSetup:
         """
         self.catalog_name = catalog_name
         self.spark = spark or SparkSession.builder.getOrCreate()
-        self.schemas = ["raw", "evaluated", "metrics"]
+        self.schemas = ["raw", "evaluated", "metrics", "metadata"]
 
     def catalog_exists(self) -> bool:
         """Check if the catalog already exists."""
@@ -200,6 +200,30 @@ class VerdictCatalogSetup:
                     'delta.minWriterVersion' = '5'
                 )
                 COMMENT 'Aggregated metrics per model version and run'
+            """,
+
+            "metadata.pipeline_runs": f"""
+                CREATE TABLE IF NOT EXISTS {self.catalog_name}.metadata.pipeline_runs (
+                    run_id STRING NOT NULL,
+                    job_id STRING,
+                    job_run_id STRING,
+                    status STRING NOT NULL,
+                    config STRING NOT NULL,
+                    task_state STRING,
+                    outputs STRING,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL,
+                    completed_at TIMESTAMP
+                )
+                USING DELTA
+                TBLPROPERTIES (
+                    'delta.autoOptimize.optimizeWrite' = 'true',
+                    'delta.autoOptimize.autoCompact' = 'true',
+                    'delta.columnMapping.mode' = 'name',
+                    'delta.minReaderVersion' = '2',
+                    'delta.minWriterVersion' = '5'
+                )
+                COMMENT 'Pipeline run state and configuration tracking'
             """
         }
 

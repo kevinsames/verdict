@@ -1,0 +1,13 @@
+# Verdict Staging Configuration
+# Overrides base.yaml for staging environment
+
+# Unity Catalog
+catalog_name: verdict_staging
+
+# Model Endpoints (staging endpoints)
+model_endpoint: databricks-gpt-oss-20b-staging
+judge_endpoint: databricks-llama-4-maverick-staging
+
+# Test Dataset Generator
+testgen:
+  output_dir: /Volumes/verdict_staging/raw/testgen_output

@@ -3,6 +3,9 @@
 #
 # This file is imported by databricks.yml via `include`
 #
+# Simplified orchestration: All configuration is stored in metadata.pipeline_runs
+# and tasks read from that table using run_id instead of passing parameters.
+#
 # Azure Databricks VM types:
 # - Standard_D4ds_v5: 4 vCPUs, 16GB RAM (general purpose)
 # - Standard_E4ds_v5: 4 vCPUs, 32GB RAM (memory optimized)
@@ -23,6 +26,8 @@ resources:
         git_branch: main
 
       parameters:
+        - name: catalog_name
+          default: ${var.catalog_name}
         - name: model_endpoint
           default: ${var.model_endpoint}
         - name: baseline_version
@@ -31,15 +36,39 @@ resources:
           default: ${var.candidate_version}
         - name: dataset_version
           default: ${var.dataset_version}
-        - name: catalog_name
-          default: ${var.catalog_name}
 
       tasks:
+        # Task 0: Initialize Run (creates run record with configuration)
+        - task_key: init_run
+          description: "Initialize pipeline run record"
+          notebook_task:
+            notebook_path: notebooks/init_run.ipynb
+            base_parameters:
+              catalog_name: "{{job.parameters.catalog_name}}"
+              model_endpoint: "{{job.parameters.model_endpoint}}"
+              baseline_version: "{{job.parameters.baseline_version}}"
+              candidate_version: "{{job.parameters.candidate_version}}"
+              dataset_version: "{{job.parameters.dataset_version}}"
+          new_cluster:
+            spark_version: 14.3.x-scala2.12
+            node_type_id: Standard_D4ds_v5
+            num_workers: 1
+            data_security_mode: SINGLE_USER
+            azure_attributes:
+              first_on_demand: 1
+              availability: ON_DEMAND_AZURE
+          timeout_seconds: 300
+
         # Task 1: Initialize Unity Catalog (run once)
         - task_key: init_catalog
           description: "Initialize Unity Catalog tables"
+          depends_on:
+            - task_key: init_run
           notebook_task:
             notebook_path: notebooks/init_catalog.ipynb
+            base_parameters:
+              run_id: "{{tasks.init_run.values.run_id}}"
+              catalog_name: "{{tasks.init_run.values.catalog_name}}"
           new_cluster:
             spark_version: 14.3.x-scala2.12
             node_type_id: Standard_D4ds_v5
@@ -58,10 +87,8 @@ resources:
           notebook_task:
             notebook_path: notebooks/run_inference.ipynb
             base_parameters:
-              model_endpoint: "{{job.parameters.model_endpoint}}"
-              dataset_version: "{{job.parameters.dataset_version}}"
-              candidate_version: "{{job.parameters.candidate_version}}"
-              catalog_name: ${var.catalog_name}
+              run_id: "{{tasks.init_run.values.run_id}}"
+              catalog_name: "{{tasks.init_run.values.catalog_name}}"
           new_cluster:
             spark_version: 14.3.x-scala2.12
             node_type_id: Standard_D4ds_v5
@@ -77,7 +104,7 @@ resources:
                 package: azure-keyvault-secrets>=4.7.0
           timeout_seconds: 3600
 
-        # Task 2a: Generate Test Dataset (optional)
+        # Task 2a: Generate Test Dataset (optional, parallel to inference)
         - task_key: testgen
           description: "Generate RAG test dataset from Qdrant"
           depends_on:
@@ -85,10 +112,8 @@ resources:
           notebook_task:
             notebook_path: notebooks/run_testgen.ipynb
             base_parameters:
-              qdrant_collection: ${var.qdrant_collection}
-              qdrant_url: ${var.qdrant_url}
-              dataset_version: "{{job.parameters.dataset_version}}"
-              catalog_name: ${var.catalog_name}
+              run_id: "{{tasks.init_run.values.run_id}}"
+              catalog_name: "{{tasks.init_run.values.catalog_name}}"
           new_cluster:
             spark_version: 14.3.x-scala2.12
             node_type_id: Standard_D4ds_v5
@@ -114,9 +139,8 @@ resources:
           notebook_task:
             notebook_path: notebooks/run_evaluation.ipynb
             base_parameters:
-              candidate_version: "{{job.parameters.candidate_version}}"
-              judge_endpoint: ${var.judge_endpoint}
-              catalog_name: ${var.catalog_name}
+              run_id: "{{tasks.init_run.values.run_id}}"
+              catalog_name: "{{tasks.init_run.values.catalog_name}}"
           new_cluster:
             spark_version: 14.3.x-scala2.12
             node_type_id: Standard_E4ds_v5
@@ -140,10 +164,8 @@ resources:
           notebook_task:
             notebook_path: notebooks/run_regression.ipynb
             base_parameters:
-              candidate_version: "{{job.parameters.candidate_version}}"
-              baseline_version: "{{job.parameters.baseline_version}}"
-              dataset_version: "{{job.parameters.dataset_version}}"
-              catalog_name: ${var.catalog_name}
+              run_id: "{{tasks.init_run.values.run_id}}"
+              catalog_name: "{{tasks.init_run.values.catalog_name}}"
           new_cluster:
             spark_version: 14.3.x-scala2.12
             node_type_id: Standard_D4ds_v5
@@ -162,8 +184,8 @@ resources:
           notebook_task:
             notebook_path: notebooks/send_alert.ipynb
             base_parameters:
-              verdict_task: regression
-              webhook_secret: verdict/alerts_webhook
+              run_id: "{{tasks.init_run.values.run_id}}"
+              catalog_name: "{{tasks.init_run.values.catalog_name}}"
           new_cluster:
             spark_version: 14.3.x-scala2.12
             node_type_id: Standard_D4ds_v5

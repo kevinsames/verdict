@@ -9,7 +9,21 @@ bundle:
 include:
   - orchestration/*.yaml
 
+# Include config files in bundle deployment
+sync:
+  include:
+    - config/*.yaml
+  paths:
+    - notebooks
+    - src
+    - config
+
 variables:
+  # Core configuration variables (simplified)
+  catalog_name:
+    description: "Unity Catalog name"
+    default: "verdict_dev"
+
   model_endpoint:
     description: "Model Serving endpoint name to evaluate"
     default: "databricks-gpt-oss-20b"
@@ -26,26 +40,6 @@ variables:
     description: "Prompt dataset version"
     default: "v1"
 
-  catalog_name:
-    description: "Unity Catalog name"
-    default: "verdict_dev"
-
-  judge_endpoint:
-    description: "LLM judge model endpoint"
-    default: "databricks-llama-4-maverick"
-
-  cluster_id:
-    description: "Existing cluster ID for init task (optional)"
-    default: ""
-
-  qdrant_collection:
-    description: "Qdrant collection name for testgen"
-    default: "documents"
-
-  qdrant_url:
-    description: "Qdrant server URL"
-    default: "http://localhost:6333"
-
 targets:
   development:
     default: true
@@ -54,7 +48,6 @@ targets:
       root_path: /Users/${DATABRICKS_USER}/verdict_dev
     variables:
       catalog_name: verdict_dev
-      cluster_id: ${DATABRICKS_CLUSTER_ID}
 
   staging:
     mode: staging

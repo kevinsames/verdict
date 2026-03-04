@@ -1,0 +1,13 @@
+# Verdict Production Configuration
+# Overrides base.yaml for production environment
+
+# Unity Catalog
+catalog_name: verdict
+
+# Model Endpoints (production endpoints)
+model_endpoint: databricks-gpt-oss-20b-prod
+judge_endpoint: databricks-llama-4-maverick-prod
+
+# Test Dataset Generator
+testgen:
+  output_dir: /Volumes/verdict/raw/testgen_output

@@ -1,0 +1,60 @@
+# Verdict Base Configuration
+# This file contains shared defaults for all environments.
+# Environment-specific overrides go in {environment}.yaml
+
+# Unity Catalog
+catalog_name: verdict_dev
+
+# Model Endpoints
+model_endpoint: databricks-gpt-oss-20b
+judge_endpoint: databricks-llama-4-maverick
+
+# Pipeline Versions
+baseline_version: "1"
+candidate_version: "2"
+dataset_version: v1
+
+# Regression Detection
+threshold: 5.0
+p_value: 0.05
+
+# Evaluation Settings
+evaluation:
+  sample_size: null
+  batch_size: 100
+  metrics:
+    - faithfulness
+    - answer_relevance
+    - toxicity
+
+# Regression Detection Settings
+regression:
+  threshold_pct: 5.0
+  p_value_threshold: 0.05
+  metrics:
+    - faithfulness
+    - answer_relevance
+    - judge_score
+    - rouge_l
+    - latency_p95
+
+# Alert Settings
+alerts:
+  # Secrets are NOT in YAML - use Databricks secrets:
+  # - webhook_url: dbutils.secrets.get("verdict", "alerts_webhook")
+  # - email_recipients: dbutils.secrets.get("verdict", "alert_emails")
+  webhook_secret: verdict/alerts_webhook
+  on_labels:
+    - WARN
+    - FAIL
+
+# Test Dataset Generator (Optional)
+testgen:
+  qdrant_collection: documents
+  qdrant_url: http://localhost:6333
+  limit: 200
+  output_dir: /Volumes/verdict_dev/raw/testgen_output
+
+# MLflow Settings
+mlflow:
+  experiment_path: /verdict/experiments

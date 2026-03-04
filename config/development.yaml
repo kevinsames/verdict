@@ -1,0 +1,13 @@
+# Verdict Development Configuration
+# Overrides base.yaml for development environment
+
+# Unity Catalog (dev uses _dev suffix)
+catalog_name: verdict_dev
+
+# Model Endpoints (dev endpoints)
+model_endpoint: databricks-gpt-oss-20b
+judge_endpoint: databricks-llama-4-maverick
+
+# Test Dataset Generator
+testgen:
+  output_dir: /Volumes/verdict_dev/raw/testgen_output
